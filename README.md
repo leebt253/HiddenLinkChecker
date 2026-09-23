@@ -150,6 +150,7 @@ URL người dùng nhập là một ranh giới bảo mật quan trọng. Implem
 ├── docs/
 │   ├── api-spec.md
 │   ├── coding-rules.md
+│   ├── database-guide.md
 │   ├── domain-model.md
 │   ├── recommendation.md
 │   └── specification.md
@@ -177,6 +178,7 @@ vi link extraction, ownership và security policy của MVP.
 - [Product specification](docs/specification.md)
 - [API contract](docs/api-spec.md)
 - [Domain model](docs/domain-model.md)
+- [PostgreSQL database guide](docs/database-guide.md)
 - [Coding rules](docs/coding-rules.md)
 
 ## Giấy phép
