@@ -8,6 +8,13 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
 
 - Tuân thủ các nguyên tắc clean code: tên rõ nghĩa, hàm nhỏ, trách nhiệm đơn
   nhất, ít phụ thuộc và dễ kiểm thử.
+- Tổ chức ứng dụng theo mô hình MVC dễ đọc và dễ maintenance: Model chịu trách
+  nhiệm domain và persistence contract, View chịu trách nhiệm trình bày/UI,
+  Controller điều phối request và use case; không đưa business rule vào View
+  hoặc truy cập database trực tiếp từ Controller.
+- Giữ business logic trong service/domain layer ở giữa Controller và Model khi
+  use case phức tạp; MVC là ranh giới tổ chức, không phải lý do để tạo thêm
+  abstraction không cần thiết.
 - Ưu tiên KISS và YAGNI; không thêm abstraction hoặc design pattern khi chưa có
   nhu cầu thực tế.
 - Tránh lặp code theo DRY, nhưng không gộp các logic khác mục đích chỉ để giảm
@@ -16,6 +23,9 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
   specification yêu cầu.
 - Không dùng biến trạng thái toàn cục có thể thay đổi. Cấu hình rule và giới
   hạn vận hành phải được truyền vào hoặc quản lý tập trung.
+- Không hard-code danh sách hoặc điều kiện rule kiểm tra lừa đảo trong source
+  code. Rule phải nằm trong file cấu hình theo schema/version đã xác định;
+  evaluator chỉ đọc và áp dụng cấu hình hợp lệ.
 
 ## 2. Quy ước Python
 
@@ -80,6 +90,11 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
   một severity.
 - Rule phải được cấu hình tập trung, có tên ổn định và trả về `matched_rules`
   cùng evidence/reason khi cần giải thích.
+- Rule configuration phải có thể được cập nhật qua web app với quyền
+  administrator và có chức năng import file theo mẫu được kiểm tra schema,
+  version, severity và nội dung điều kiện trước khi publish.
+- Lưu version rule được dùng cho mỗi scan để kết quả lịch sử vẫn giải thích và
+  tái lập được sau khi cấu hình thay đổi.
 - Rule gambling hoặc tín hiệu tương đương có thể tạo `critical`; destination
   ngoài origin, redirect bất thường hoặc dữ liệu thiếu có thể tạo tối thiểu
   `warning`.

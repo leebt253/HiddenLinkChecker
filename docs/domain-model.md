@@ -18,7 +18,11 @@ erDiagram
     SCAN }o--o| SNAPSHOT_REFERENCE : "may reference"
 ```
 
-`RULE` trong sơ đồ là khái niệm cấu hình logic. Tài liệu hiện chưa xác nhận rule được lưu như entity trong database hay có quan hệ khóa ngoại với `FINDING`. `SNAPSHOT_REFERENCE` biểu diễn tham chiếu tới artifact; nội dung và cách cấp quyền tải snapshot chưa được chốt.
+`RULE` trong sơ đồ là khái niệm cấu hình logic được quản lý bằng file có
+schema/version và được publish qua web app hoặc import theo mẫu. PostgreSQL là
+database chính; việc lưu rule set/version và reference trong finding phải giữ
+được khả năng giải thích lịch sử. `SNAPSHOT_REFERENCE` biểu diễn tham chiếu tới
+artifact; nội dung và cách cấp quyền tải snapshot chưa được chốt.
 
 ## 3. Entity
 
@@ -99,6 +103,7 @@ Request `include_snapshot` là lựa chọn khi tạo scan. Chưa xác nhận c�
 | `position` | Bounding box `{x, y, width, height}` | Có thể `null` nếu element không render/không lấy được vị trí |
 | `severity` | Mức ưu tiên review | Chính xác một trong `safe`, `warning`, `critical` |
 | `matched_rules` | Tên các rule khớp | Danh sách; `[]` khi không rule nào khớp |
+| `rule_set_version` | Version bộ rule dùng để đánh giá | Bắt buộc để giải thích kết quả lịch sử |
 
 **Quan hệ:** mỗi finding thuộc đúng một scan. Scan cung cấp user ownership gián tiếp; API phải xác thực quyền ở cấp scan trước khi trả findings.
 
@@ -124,9 +129,14 @@ Request `include_snapshot` là lựa chọn khi tạo scan. Chưa xác nhận c�
 - Nếu nhiều rule khớp, kết quả phải phản ánh severity phù hợp và nêu các rule khớp; thứ tự ưu tiên cụ thể cần nhất quán giữa evaluator và contract.
 - Rule phải có giải thích; rule không kết luận malware/phishing.
 
-**Mô hình hóa:** `Rule` hiện là khái niệm cấu hình, chưa được xác nhận là entity persisted. `matched_rules` trong Finding/API là danh sách tên rule, chưa phải liên kết tới record Rule.
+**Mô hình hóa:** `Rule` là cấu hình được version hóa; file rule không được chứa
+mã thực thi tùy ý. `matched_rules` trong Finding/API vẫn là danh sách tên rule,
+còn `rule_set_version` xác định bộ cấu hình đã được áp dụng.
 
-**[DECISION REQUIRED]** Chốt schema rule (ví dụ `name`, `severity`, `condition`, `reason`), nơi lưu và ai quản trị; versioning; rule active/effective theo thời điểm nào; severity precedence; và có cần lưu rule version/evidence tại thời điểm scan để kết quả lịch sử có thể tái giải thích hay không.
+Schema tối thiểu của file rule gồm `schema_version`, `name`, `severity`,
+`condition` và `reason`; administrator quản trị qua web app hoặc import file.
+Các chi tiết về persistence vật lý, effective time và severity precedence vẫn
+phải được chốt trong thiết kế triển khai.
 
 ## 4. Value object và miền giá trị
 
@@ -200,7 +210,7 @@ Sơ đồ chỉ thể hiện các chuyển tiếp được tài liệu nêu. Kh�
 | `Rule`, `Severity`, matched rule/evidence | BR-005/006, FR-006, AC-02 | Severity và gambling/external destination behavior được xác nhận; model evidence/version còn mở |
 | Snapshot, counts, limitations | BR-007/011, FR-007/008, AC-03/06 | API có snapshot reference/counts/limitations; persistence của limitation và quyền tải snapshot cần đồng bộ |
 | Ownership và deletion | BR-008, FR-009, AC-04 | Owner scoping và xóa dữ liệu liên quan được xác nhận; semantics xóa và retention duration còn mở |
-| Rule extensibility | BR-012 | Cấu hình tập trung được yêu cầu; quản trị/versioning chưa chốt và không có API admin trong MVP |
+| Rule extensibility | BR-012 | Rule file có schema/version, quản trị/import qua web app; chi tiết API admin còn cần chốt |
 
 ## 9. Mâu thuẫn và quyết định cần chốt
 
@@ -212,7 +222,7 @@ Sơ đồ chỉ thể hiện các chuyển tiếp được tài liệu nêu. Kh�
 6. **Delete/retention:** chưa rõ hard delete/soft delete, thời hạn retention, purge snapshot và hành vi xóa scan đang chạy.
 7. **User:** format ID, chuẩn hóa/unique email, miền giá trị `status` và lifecycle tài khoản chưa chốt.
 8. **Scan/Finding limits:** độ dài URL/text, số finding tối đa, deduplication, vị trí/đơn vị bounding box và semantics counts khi scan chưa kết thúc chưa chốt.
-9. **Rule management:** product spec nêu administrator quản lý rule, retention và limits; API contract xác nhận chưa có endpoint quản trị rule trong MVP. Cần xác nhận đây là vận hành ngoài API hay ngoài scope MVP.
+9. **Rule management API:** web app phải hỗ trợ quản trị/import rule theo specification; API endpoint, audit log và persistence chi tiết cần được thiết kế trước khi triển khai.
 10. **Operational policy:** worker timeout, response size và resource limits được yêu cầu nhưng giá trị cấu hình cụ thể còn mở.
 
 Cho tới khi các mục trên được quyết định, chúng không phải contract đã duyệt và không được âm thầm cố định trong schema/API.

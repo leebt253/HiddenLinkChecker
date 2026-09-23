@@ -4,6 +4,11 @@ Công cụ kiểm tra link trên web dựa trên rule, giúp phát hiện các U
 
 Hidden Link Checker giúp người dùng đối chiếu nội dung đang hiển thị trên một trang web với đích thực tế được nhúng bên dưới. Mỗi URL được chuẩn hóa, phân loại theo loại phần tử nguồn và đánh giá bằng các rule có thể giải thích với mức `safe`, `warning` hoặc `critical`.
 
+Kiến trúc ứng dụng được định hướng theo MVC để tách Model, View và Controller,
+giữ code dễ đọc và maintenance. PostgreSQL là database chính cho web app; rule
+kiểm tra không hard-code trong evaluator mà được quản lý bằng file cấu hình có
+version, có thể chỉnh sửa trên web app hoặc import theo file mẫu sau khi validate.
+
 > **Trạng thái dự án:** skeleton MVP đang được phát triển. Core trích xuất link và đánh giá rule đã có; dashboard có xác thực, browser worker và lưu database sẽ được triển khai ở các bước tiếp theo.
 
 ## Vì sao xây dựng dự án này?
@@ -42,6 +47,11 @@ Python core hiện tại có thể:
 - Đánh giá destination ngoài origin của trang ở mức `warning`.
 - Có unit test và integration test cho hành vi core.
 
+Rule production phải được tải từ file cấu hình theo schema/version, không phải
+danh sách điều kiện viết cứng trong source code. Administrator có thể quản lý
+rule trên web app hoặc import file theo mẫu; mỗi scan cần lưu version rule đã sử
+dụng để giải thích kết quả lịch sử.
+
 ## Phạm vi MVP dự kiến
 
 - Đăng ký, đăng nhập, đăng xuất và lịch sử scan theo từng user.
@@ -49,6 +59,8 @@ Python core hiện tại có thể:
 - Bounding box liên kết mỗi finding với vị trí tương ứng trên snapshot.
 - Dashboard có bộ đếm severity, bộ lọc, highlight trên snapshot và grid finding.
 - Lưu user, scan, finding, severity, matched rule và metadata retention vào database.
+- Dùng PostgreSQL làm database chính, với migration, foreign key, transaction và
+	index cho ownership, scan history, finding filter và rule version.
 - API cho authentication, tạo scan, lấy kết quả, findings, lịch sử và xóa dữ liệu.
 - SSRF protection, kiểm tra lại redirect, giới hạn tài nguyên, sandbox và rate limit.
 
@@ -186,7 +198,8 @@ Pull request được kiểm tra bằng GitHub Actions và cần được review
 3. Tách riêng extractor, rule evaluator, persistence và API contract.
 4. Thêm authentication, lịch sử scan trong database và ownership enforcement.
 5. Xây dashboard grid, bộ lọc, bộ đếm và highlight trên snapshot.
-6. Bổ sung security control production, observability, retention và rate limit.
+6. Thêm web rule management, import file theo mẫu, validation và versioning.
+7. Bổ sung security control production, observability, retention và rate limit.
 
 ## License
 

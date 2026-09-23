@@ -96,7 +96,24 @@ Mỗi finding phải nhận đúng một severity:
 | `warning` | Destination ngoài origin, redirect bất thường, scheme cần xem xét hoặc dữ liệu thiếu | Cần kiểm tra thủ công |
 | `safe` | Không có rule rủi ro nào khớp | Chưa phát hiện tín hiệu trong phạm vi scan |
 
-Rule phải được cấu hình tập trung và trả về `matched_rules` cùng thông tin giải thích. Rule không được kết luận website là malware hoặc phishing.
+Rule phải được cấu hình tập trung trong file theo schema/version riêng, không
+được hard-code danh sách keyword hoặc điều kiện lừa đảo vào evaluator. Hệ thống
+phải trả về `matched_rules` cùng thông tin giải thích và version của bộ rule đã
+dùng. Rule không được kết luận website là malware hoặc phishing.
+
+### FR-010 Rule configuration and import
+
+System phải hỗ trợ administrator:
+
+- xem, tạo, sửa, vô hiệu hóa và publish rule từ web app;
+- import file rule theo mẫu chính thức, tối thiểu có `schema_version`, `name`,
+  `severity`, `condition` và `reason`;
+- validate schema, tên duy nhất, severity hợp lệ, điều kiện được hỗ trợ và
+  quyền publish trước khi áp dụng;
+- xem lịch sử version và biết version nào được dùng cho mỗi scan.
+
+Rule file là nguồn cấu hình, không phải mã thực thi tùy ý. Import không được
+cho phép chạy Python, expression hoặc script do người dùng cung cấp.
 
 ### FR-007 Scan result and dashboard
 
@@ -166,7 +183,7 @@ Response tạo scan tối thiểu:
 
 ### Finding
 
-`id`, `scan_id`, `element_type`, `source_url`, `normalized_url`, `visible_text`, `alt_text`, `matched_content`, `position`, `severity`, `matched_rules`
+`id`, `scan_id`, `element_type`, `source_url`, `normalized_url`, `visible_text`, `alt_text`, `matched_content`, `position`, `severity`, `matched_rules`, `rule_set_version`
 
 ## 7. Non-functional requirements
 
@@ -175,7 +192,11 @@ Response tạo scan tối thiểu:
 - **Privacy:** snapshot và URL có retention; hạn chế log query string nhạy cảm.
 - **Reliability:** timeout, 403, 429, SSL error và HTML lỗi phải trả trạng thái có kiểm soát.
 - **Performance:** static page nhỏ phải hoàn tất trong timeout cấu hình; dashboard không cần tải toàn bộ HTML.
-- **Maintainability:** extractor, rule evaluator, persistence và UI contract phải tách biệt; rule có test riêng.
+- **Maintainability:** ứng dụng tổ chức theo MVC dễ đọc và maintenance; extractor,
+  rule evaluator, persistence và UI contract phải tách biệt; rule có test riêng.
+- **Persistence:** PostgreSQL là database chính, dùng migration có version,
+  foreign key, transaction và index phù hợp cho ownership, lifecycle scan,
+  finding filters và rule version. SQLite chỉ dành cho test/prototype nếu cần.
 
 ## 8. Known limitations
 

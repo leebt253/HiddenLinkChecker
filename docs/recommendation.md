@@ -10,6 +10,15 @@ Khuyến nghị xây dựng **Hidden Link Checker** thành một công cụ web 
 
 Sản phẩm nên bắt đầu bằng MVP có khả năng giải thích kết quả, thay vì cố gắng trở thành hệ thống threat intelligence hoặc malware scanner toàn diện.
 
+Về nền tảng dữ liệu, khuyến nghị dùng **PostgreSQL làm database chính**. Domain
+`User -> Scan -> Finding` có quan hệ và ownership rõ ràng, cần transaction khi
+tạo/xóa dữ liệu liên quan, constraint để bảo vệ toàn vẹn và truy vấn đồng thời
+cho dashboard/lịch sử. PostgreSQL cũng phù hợp để lưu các phần có cấu trúc linh
+hoạt như `position`, evidence hoặc metadata dưới dạng JSONB trong khi vẫn giữ
+các field nghiệp vụ quan trọng ở cột có kiểu và index rõ ràng. SQLite chỉ nên
+dùng cho test hoặc prototype đơn tiến trình, không nên là database production
+cho web app nhiều worker.
+
 ## 2. Customer problem
 
 Một trang web có thể hiển thị text hoặc hình ảnh bình thường nhưng dẫn tới destination khác với kỳ vọng. URL còn có thể nằm trong CSS background hoặc nội dung được tạo sau khi JavaScript chạy. Nếu chỉ xem danh sách URL, người dùng thiếu ngữ cảnh để đối chiếu với vị trí và nội dung trên trang.
@@ -31,6 +40,11 @@ MVP nên cung cấp:
 - Giải thích bằng `matched_rules`, không chỉ hiển thị màu hoặc điểm số.
 - Lịch sử scan theo tài khoản và khả năng xóa dữ liệu.
 - Chính sách bảo vệ SSRF và cô lập browser worker ngay từ phiên bản đầu.
+- Bộ rule không hard-code trong evaluator; rule được quản lý như cấu hình có
+	schema/version riêng, có thể chỉnh sửa trên web app bởi administrator và
+	import từ file theo mẫu.
+- PostgreSQL là persistence chính; migration, transaction, foreign key và
+	index phải được thiết kế cùng model User, Scan, Finding và Rule.
 
 ## 4. Customer-facing recommendation
 
@@ -82,10 +96,18 @@ Các quyết định nên được chốt trước khi triển khai đầy đủ
 - Thời gian chờ, kích thước response và giới hạn tài nguyên của worker.
 - Thời gian retention của snapshot và finding.
 - Bộ keyword/rule mặc định và cơ chế quản trị rule.
+- Schema/version của file rule, quyền publish, lịch sử thay đổi và rule version
+	được gắn vào kết quả scan.
+- PostgreSQL deployment, migration strategy, backup/restore và retention purge.
 - Cách hiển thị URL có query string nhạy cảm.
 - Chính sách xử lý trang yêu cầu login, CAPTCHA hoặc trả lỗi mạng.
 - Contract chính thức cho trạng thái scan và finding.
 
 ## 8. Recommendation conclusion
 
-Nên triển khai theo từng lát dọc: scan an toàn một URL, trích xuất ba nhóm finding, đánh giá rule, hiển thị kết quả và lưu theo user. Mỗi lát cần có test bảo mật và test giải thích kết quả. Cách này tạo ra giá trị sử dụng sớm mà vẫn giữ đúng ranh giới của sản phẩm.
+Nên triển khai theo từng lát dọc: scan an toàn một URL, trích xuất ba nhóm
+finding, đánh giá rule từ file cấu hình, hiển thị kết quả và lưu theo user trong
+PostgreSQL. Web app cần cho administrator chỉnh sửa rule hoặc import file theo
+mẫu, validate trước khi publish và gắn version rule vào scan. Mỗi lát cần có
+test bảo mật, test giải thích kết quả và test migration/ownership. Cách này tạo
+ra giá trị sử dụng sớm mà vẫn giữ đúng ranh giới của sản phẩm.
