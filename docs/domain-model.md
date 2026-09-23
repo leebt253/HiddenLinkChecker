@@ -78,7 +78,7 @@ Index tối thiểu:
 - `users.google_subject` unique;
 - `link_checks.user_id, created_at` cho lịch sử;
 - `link_results.link_check_id` cho chi tiết kết quả;
-- `link_results.is_hidden` nếu dashboard cần lọc link thường/hidden.
+- `link_results.visibility` nếu dashboard cần lọc direct/indirect.
 
 DOM lớn nên lưu ngoài database và chỉ lưu reference; metadata có cấu trúc linh
 hoạt có thể dùng JSONB khi cần.

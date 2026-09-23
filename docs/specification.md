@@ -67,7 +67,7 @@ Processor phải trả về DOM hoặc phần DOM được phép lưu theo priva
 phát hiện các URL sau trong phạm vi DOM/style đọc được:
 
 - `text`: `href` của anchor hoặc phần tử có hành vi điều hướng, kèm visible text;
-  đây là link thường nếu hiển thị trực tiếp trên trang.
+  có `visibility = direct` nếu hiển thị trực tiếp trên trang.
 - `image`: `src`, `srcset`, URL bao quanh ảnh và alt text liên quan.
 - `background`: URL trong `background`, `background-image` hoặc style tương đương có thể đọc được.
 
@@ -106,7 +106,7 @@ Dashboard của link check hoàn tất phải hiển thị:
 - DOM hoặc phần DOM được phép lưu.
 - Danh sách hidden link và visibility của từng kết quả.
 - Object/thuộc tính DOM, URL nguồn và actual URL của từng kết quả.
-- Bộ lọc theo `is_hidden`, element type hoặc domain nếu cần.
+- Bộ lọc theo `visibility`, element type hoặc domain nếu cần.
 
 ### FR-007 Link check lifecycle
 
@@ -168,7 +168,7 @@ Response tạo scan tối thiểu:
 
 ### LinkResult
 
-`id`, `link_check_id`, `element_type`, `object_reference`, `source_url`, `actual_url`, `is_hidden`, `visible_text`, `alt_text`, `position`
+`id`, `link_check_id`, `element_type`, `object_reference`, `source_url`, `actual_url`, `visibility`, `visible_text`, `alt_text`, `position`
 
 ## 7. Non-functional requirements
 

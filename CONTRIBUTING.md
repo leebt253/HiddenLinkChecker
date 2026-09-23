@@ -10,8 +10,10 @@
 
 ## Nguyên tắc riêng của dự án
 
-- Không mở rộng scope khỏi link thường và hidden link trong text/image/background
-	nếu chưa cập nhật `docs/recommendation.md`, `docs/specification.md` và BRD.
+- Không mở rộng scope khỏi hidden link trong text/image/background; hidden link
+	hiển thị trực tiếp là `visibility = direct`, còn hidden link không hiển thị
+	trực tiếp là `visibility = indirect`, nếu chưa cập nhật
+	`docs/recommendation.md`, `docs/specification.md` và BRD.
 - Không thêm rule đánh giá rủi ro, severity hoặc malware/phishing verdict vào MVP
 	nếu chưa có quyết định scope mới và cập nhật tài liệu liên quan.
 - Mọi code nhận/render URL phải có SSRF và resource-limit consideration.

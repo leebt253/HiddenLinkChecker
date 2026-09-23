@@ -2,8 +2,8 @@
 
 ## 1. Phạm vi
 
-API MVP hỗ trợ Google OAuth, tạo một lần kiểm tra URL, lấy link thường và hidden
-link từ DOM của URL đầu vào, lưu kết quả theo user và tải lịch sử. API không
+API MVP hỗ trợ Google OAuth, tạo một lần kiểm tra URL, lấy hidden link từ DOM
+của URL đầu vào, lưu kết quả theo user và tải lịch sử. API không
 fetch, mở hoặc điều hướng tới các link được phát hiện.
 
 ## 2. Endpoints
@@ -79,7 +79,7 @@ nào được phát hiện trong DOM.
       "object_reference": "img_42",
       "source_url": "/promo",
       "actual_url": "https://example.com/promo",
-      "is_hidden": true,
+      "visibility": "indirect",
       "visible_text": "",
       "alt_text": "Promotion",
       "position": null
@@ -88,8 +88,9 @@ nào được phát hiện trong DOM.
 }
 ```
 
-`is_hidden = false` biểu thị link hiển thị trực tiếp; `is_hidden = true` biểu
-thị link nằm sau image, background hoặc object không hiển thị như link trực tiếp.
+Mọi kết quả trong response là hidden link. `visibility = direct` biểu thị link
+hiển thị trực tiếp; `visibility = indirect` biểu thị link nằm sau image,
+background hoặc object không hiển thị như link trực tiếp.
 MVP không có trường đánh giá rủi ro hoặc risk verdict.
 
 ## 6. Ownership và CRUD
@@ -122,4 +123,4 @@ Index tối thiểu:
 - unique `users.google_subject`;
 - `link_checks(user_id, created_at)`;
 - `link_results(link_check_id)`;
-- `link_results(is_hidden)` khi dashboard cần filter.
+- `link_results(visibility)` khi dashboard cần filter.

@@ -1,7 +1,7 @@
 ﻿# Coding Rules - Hidden Link Checker
 
 Tài liệu này áp dụng cho mã Python của Hidden Link Checker. MVP tập trung vào
-phát hiện link thường và hidden link từ DOM của URL đầu vào, bảo vệ an toàn khi
+phát hiện hidden link từ DOM của URL đầu vào, bảo vệ an toàn khi
 render URL và giữ dữ liệu đúng phạm vi tài khoản.
 
 ## 1. Nguyên tắc thiết kế
@@ -84,12 +84,12 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
 ## 6. Link extraction và result
 
 - Mỗi link result phải giữ `element_type`, `object_reference`, `source_url`,
-  `actual_url` và `is_hidden`.
+  `actual_url` và `visibility`.
 - URL tương đối phải được resolve theo final URL của trang đầu vào.
 - `actual_url` chỉ là dữ liệu kết quả; không được fetch, mở hoặc điều hướng tới
   link đã phát hiện.
-- Link thường và hidden link phải được phân biệt bằng thuộc tính DOM/object và
-  lưu nhất quán trong `is_hidden`.
+- Mọi kết quả đều là hidden link; phân biệt link hiển thị trực tiếp và không
+  trực tiếp bằng `visibility = direct` hoặc `visibility = indirect`.
 - Khi không thể đọc đầy đủ nội dung do JavaScript, iframe, CAPTCHA, login,
   timeout hoặc resource limit, ghi nhận `partial` và limitation thay vì đoán.
 
@@ -97,7 +97,7 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
 
 - Mọi truy vấn link check và link result phải kiểm tra authenticated `user_id`.
 - Không trả hoặc xóa dữ liệu của user khác chỉ dựa trên `check_id` do client gửi.
-- Password phải được hash; không lưu hoặc log password dạng plain text.
+- Không lưu hoặc log Google OAuth credential/token.
 - DOM, URL và link result phải tuân thủ retention policy; việc xóa link check
   phải xử lý dữ liệu liên quan theo cùng policy.
 - Error response phải đủ hữu ích cho client nhưng không làm lộ secret, thông tin
@@ -105,8 +105,8 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
 
 ## 8. Kiểm thử và chất lượng
 
-- Viết unit test riêng cho extractor, URL normalization, phân biệt link thường/
-  hidden và các policy bảo mật.
+- Viết unit test riêng cho extractor, URL normalization, visibility direct/
+  indirect và các policy bảo mật.
 - Viết integration test cho các lát dọc chính: lấy DOM an toàn của một URL,
   trích xuất text/image/background, lưu kết quả và chuyển trạng thái link check.
 - Kiểm thử cả trường hợp lỗi: URL không hợp lệ, redirect nguy hiểm, timeout,
