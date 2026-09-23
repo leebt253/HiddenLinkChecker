@@ -36,9 +36,13 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
 - Mỗi hàm chỉ nên có một trách nhiệm và có thể mô tả mục đích bằng một câu.
 - Giữ hàm ngắn, dễ đọc; khi logic có nhiều nhánh hoặc vượt quá khoảng 20-30
   dòng có ý nghĩa, xem xét tách thành hàm private có tên rõ ràng.
-- Không khai báo biến trong vòng lặp. Khai báo và chuẩn bị dữ liệu trước vòng
-  lặp khi biến có thể tái sử dụng; nếu giá trị chỉ có ý nghĩa trong một vòng
-  lặp, dùng biểu thức trực tiếp hoặc tách logic thành hàm riêng.
+- Chỉ tạo biến trung gian khi tên biến giúp làm rõ ý nghĩa hoặc giá trị được
+  dùng nhiều lần. Biến vòng lặp được khuyến khích khi giúp biểu diễn rõ từng
+  phần tử; không nhồi biểu thức phức tạp vào vòng lặp chỉ để tránh khai báo
+  biến.
+- Không dùng list comprehension hoặc biểu thức tạo collection để thực hiện
+  side effect. Dùng vòng lặp tường minh khi cần cập nhật trạng thái, gọi hàm
+  có side effect hoặc xử lý lỗi riêng cho từng phần tử.
 - Tránh lồng vòng lặp và điều kiện sâu; dùng early return, guard clause hoặc
   hàm hỗ trợ để làm phẳng control flow.
 - Không dùng list comprehension chỉ để tạo side effect. Dùng vòng lặp rõ ràng
@@ -106,4 +110,3 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
   cùng lúc với bản sửa.
 - Trước khi hoàn tất thay đổi, chạy formatter/linter và test phù hợp; không bỏ
   qua test chỉ vì kết quả vẫn hiển thị được.
-
