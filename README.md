@@ -1,111 +1,79 @@
 # Hidden Link Checker
 
-Công cụ kiểm tra link trên web dựa trên rule, giúp phát hiện các URL ẩn phía sau text, hình ảnh và CSS background.
+Ứng dụng web giúp người dùng nhập một URL và tìm các hidden link trong DOM của
+trang đó. Trong domain này, hidden link là mọi URL được phát hiện; link hiển thị
+trực tiếp chỉ là một dạng hidden link có `visibility = direct`.
 
-Hidden Link Checker giúp người dùng đối chiếu nội dung đang hiển thị trên một trang web với đích thực tế được nhúng bên dưới. Mỗi URL được chuẩn hóa, phân loại theo loại phần tử nguồn và đánh giá bằng các rule có thể giải thích với mức `safe`, `warning` hoặc `critical`.
+## Mục lục
 
-Kiến trúc ứng dụng được định hướng theo MVC để tách Model, View và Controller,
-giữ code dễ đọc và maintenance. PostgreSQL là database chính cho web app; rule
-kiểm tra không hard-code trong evaluator mà được quản lý bằng file cấu hình có
-version, có thể chỉnh sửa trên web app hoặc import theo file mẫu sau khi validate.
+- [Giới thiệu](#giới-thiệu)
+- [Tính năng](#tính-năng)
+- [Kiến trúc và công nghệ](#kiến-trúc-và-công-nghệ)
+- [Cài đặt](#cài-đặt)
+- [Sử dụng](#sử-dụng)
+- [Bảo mật](#bảo-mật)
+- [Cấu trúc repository](#cấu-trúc-repository)
+- [Đóng góp](#đóng-góp)
+- [Giấy phép](#giấy-phép)
 
-> **Trạng thái dự án:** skeleton MVP đang được phát triển. Core trích xuất link và đánh giá rule đã có; dashboard có xác thực, browser worker và lưu database sẽ được triển khai ở các bước tiếp theo.
+## Giới thiệu
 
-## Vì sao xây dựng dự án này?
+Hidden Link Checker lấy DOM của URL do người dùng cung cấp, trích xuất các URL
+được tham chiếu bởi text, hình ảnh và CSS background, sau đó hiển thị kết quả
+trên dashboard. Mỗi kết quả cho biết object/thuộc tính DOM, URL nguồn, URL thực
+tế sau khi resolve và visibility của hidden link.
 
-Một link có thể trông vô hại nhưng lại dẫn tới một địa chỉ không như người dùng kỳ vọng. Việc kiểm tra càng khó hơn khi URL nằm trong hình ảnh, CSS background inline hoặc một phần tử trực quan không giống hyperlink thông thường.
+Ứng dụng không tự động mở, fetch hoặc điều hướng tới các link được phát hiện.
 
-Luồng sản phẩm dự kiến:
-
-```text
-Đăng ký / đăng nhập
-	|
-	v
-Gửi URL của trang cần kiểm tra
-	|
-	v
-Render an toàn -> phát hiện URL ẩn -> áp dụng rule
-	|
-	v
-Dashboard snapshot + grid finding + lịch sử scan
-```
-
-Dự án hướng tới việc triage có thể giải thích. Kết quả `safe` chỉ có nghĩa là không có rule nào đã cấu hình khớp trong phạm vi scan; đây không phải cam kết website an toàn.
-
-## Tính năng hiện có
-
-Python core hiện tại có thể:
-
-- Trích xuất URL từ:
-  - text link như `<a href="...">`;
-  - hình ảnh thông qua `src` và `srcset`;
-  - CSS inline như `background-image: url(...)`.
-- Resolve URL tương đối dựa trên URL của trang được scan.
-- Giữ lại loại nguồn là `text`, `image` hoặc `background`.
-- Áp dụng rule có thể cấu hình và trả về `matched_rules`.
-- Đánh giá các keyword liên quan đến cờ bạc như `casino`, `poker`, `slot`, `betting` và `gambling` ở mức `critical`.
-- Đánh giá destination ngoài origin của trang ở mức `warning`.
-- Có unit test và integration test cho hành vi core.
-
-Rule production phải được tải từ file cấu hình theo schema/version, không phải
-danh sách điều kiện viết cứng trong source code. Administrator có thể quản lý
-rule trên web app hoặc import file theo mẫu; mỗi scan cần lưu version rule đã sử
-dụng để giải thích kết quả lịch sử.
-
-## Phạm vi MVP dự kiến
-
-- Đăng ký, đăng nhập, đăng xuất và lịch sử scan theo từng user.
-- Browser worker cô lập để đọc DOM đã render, computed style, nội dung do JavaScript tạo và ảnh chụp trang.
-- Bounding box liên kết mỗi finding với vị trí tương ứng trên snapshot.
-- Dashboard có bộ đếm severity, bộ lọc, highlight trên snapshot và grid finding.
-- Lưu user, scan, finding, severity, matched rule và metadata retention vào database.
-- Dùng PostgreSQL làm database chính, với migration, foreign key, transaction và
-	index cho ownership, scan history, finding filter và rule version.
-- API cho authentication, tạo scan, lấy kết quả, findings, lịch sử và xóa dữ liệu.
-- SSRF protection, kiểm tra lại redirect, giới hạn tài nguyên, sandbox và rate limit.
-
-## Mô hình severity
-
-| Mức độ | Rule ban đầu | Ý nghĩa |
-|---|---|---|
-| `critical` | Keyword gambling/casino/betting xuất hiện trong URL hoặc ngữ cảnh hiển thị của finding | Tín hiệu ưu tiên cao, cần kiểm tra |
-| `warning` | Destination ngoài domain hoặc khớp một tín hiệu cần xem xét khác | Cần kiểm tra thủ công |
-| `safe` | Không có rule nào đã cấu hình khớp | Chưa phát hiện tín hiệu trong phạm vi scan hiện tại |
-
-Mọi kết quả khác `safe` nên hiển thị tên rule và evidence dẫn tới việc phân loại. Rule chỉ là tín hiệu hỗ trợ review, không phải kết luận tuyệt đối về malware hoặc phishing.
-
-## Cấu trúc repository
+Luồng sử dụng chính:
 
 ```text
-.
-├── docs/
-│   ├── br-analysis.md             # Business requirements và acceptance criteria
-│   ├── context-engineering.md     # Context pack cho AI/team
-│   ├── recommendation.md         # Khuyến nghị sản phẩm từ góc nhìn khách hàng
-│   ├── specification.md          # Đặc tả sản phẩm và yêu cầu MVP
-│   └── project-scaffold.md        # Ghi chú scaffold của Lab 1.1
-├── src/
-│   └── hidden_link_checker/
-│       ├── models.py              # Model Finding và severity
-│       ├── rules.py               # Rule evaluator có thể giải thích
-│       └── scanner.py             # Trích xuất URL từ HTML/CSS
-├── tests/
-│   ├── integration/
-│   └── unit/
-├── pyproject.toml
-└── CONTRIBUTING.md
+Đăng nhập bằng Google
+				|
+				v
+Nhập URL trên dashboard
+				|
+				v
+API lấy DOM của URL đầu vào
+				|
+				v
+Hiển thị và lưu hidden link theo user
 ```
 
-## Yêu cầu môi trường
+## Tính năng
 
-- Python 3.11 trở lên
-- `pip`
+- Đăng nhập và đăng xuất bằng Google OAuth/OIDC.
+- Nhập một URL trên dashboard để kiểm tra.
+- Tìm hidden link từ text, image, `srcset`, CSS background hoặc object liên quan
+	trong DOM.
+- Phân biệt visibility của hidden link: `direct` nếu hiển thị trực tiếp và
+	`indirect` nếu nằm sau image, background hoặc object khác.
+- Resolve URL tương đối theo URL cuối cùng của trang đầu vào.
+- Hiển thị URL nguồn, URL thực tế, loại object và thông tin element.
+- Lưu kết quả theo user và tải lại lịch sử kiểm tra.
+- API-first: authentication, tạo, đọc, cập nhật và xóa dữ liệu đều đi qua API.
+- PostgreSQL làm database chính cho user, link check và link result.
 
-Core trích xuất hiện chỉ sử dụng standard library của Python. Bộ test cần thêm `pytest`.
+## Kiến trúc và công nghệ
 
-## Bắt đầu nhanh
+- **Backend:** Python.
+- **Application structure:** MVC, với extractor/service nằm giữa controller và
+	persistence khi use case cần điều phối.
+- **Authentication:** Google OAuth/OIDC.
+- **Database:** PostgreSQL với migration, foreign key, transaction và index cho
+	ownership/lịch sử.
+- **Processing:** browser worker cô lập chỉ truy cập URL đầu vào.
+- **Frontend:** dashboard gọi API; không truy cập database trực tiếp.
 
-### 1. Tạo môi trường ảo
+## Cài đặt
+
+### Yêu cầu
+
+- Python 3.11 trở lên.
+- `pip`.
+- PostgreSQL khi chạy các thành phần persistence/web application.
+
+### Thiết lập môi trường Python
 
 ```bash
 python -m venv .venv
@@ -123,7 +91,7 @@ Kích hoạt trên macOS/Linux:
 source .venv/bin/activate
 ```
 
-### 2. Cài đặt project
+Cài đặt project và công cụ test:
 
 ```bash
 python -m pip install --upgrade pip
@@ -131,76 +99,87 @@ python -m pip install -e .
 python -m pip install pytest
 ```
 
-### 3. Chạy test
+Google OAuth credentials và cấu hình PostgreSQL sẽ được cung cấp qua biến môi
+trường khi web application được triển khai.
+
+## Sử dụng
+
+### Chạy test
 
 ```bash
 python -m pytest -q
 ```
 
-### 4. Thử core trích xuất
+### Thử core trích xuất
 
 ```python
 from hidden_link_checker import extract_findings
 
 html = """
-<a href="/offers/casino">Claim reward</a>
-<img src="/banner.png" alt="Welcome banner">
+<a href="/about">About</a>
+<img src="/banner.png" alt="Banner">
 <div style="background-image: url('/promo.png')"></div>
 """
 
-findings = extract_findings(html, "https://example.test/home")
+links = extract_findings(html, "https://example.test/home")
 
-for finding in findings:
-    print(finding.element_type, finding.normalized_url, finding.severity)
+for link in links:
+	print(link.element_type, link.normalized_url, link.visibility)
 ```
 
-Finding đầu tiên được đánh giá là `critical` vì destination chứa keyword cờ bạc đã cấu hình. Hình ảnh và background tạo ra các finding riêng để sau này hiển thị thành card trên dashboard.
+Kết quả cho biết loại object, URL nguồn, URL sau khi resolve và `visibility`.
 
-## Ranh giới bảo mật
+## Bảo mật
 
-Service dự kiến nhận URL do user cung cấp và render các trang bên thứ ba. Đây là ranh giới bảo mật quan trọng liên quan đến SSRF và cô lập browser.
+URL người dùng nhập là một ranh giới bảo mật quan trọng. Implementation phải:
 
-Trước khi expose việc scan qua API hoặc worker, implementation phải:
+- Chỉ cho phép scheme `http` và `https`.
+- Chặn localhost, loopback, private IP, link-local, multicast và cloud metadata.
+- Kiểm tra DNS/IP trước khi truy cập và sau mỗi redirect của URL đầu vào.
+- Không fetch, mở hoặc điều hướng tới link được phát hiện trong DOM.
+- Áp dụng timeout, giới hạn response size, CPU, memory, concurrency và redirect.
+- Không gửi cookie, authorization header hoặc application secret tới URL đầu vào.
+- Chạy browser worker trong sandbox cô lập.
+- Kiểm tra Google authentication và ownership cho mọi thao tác dữ liệu.
+- Không ghi OAuth credential, query string nhạy cảm hoặc DOM không cần thiết vào log.
 
-- chỉ cho phép `http` và `https`;
-- từ chối localhost, loopback, private IP, link-local, multicast và cloud metadata address;
-- resolve và kiểm tra destination sau mỗi redirect;
-- giới hạn thời gian kết nối, thời gian browser, kích thước response, CPU, memory và concurrency;
-- không forward cookie, authorization header hoặc application secret;
-- chạy browser trong sandbox cô lập, không truy cập trực tiếp database;
-- kiểm tra authentication và ownership cho scan, finding và snapshot;
-- mặc định không ghi query string nhạy cảm hoặc nội dung trang vào log.
+## Cấu trúc repository
 
-Xem [SECURITY.md](SECURITY.md) để biết chính sách báo cáo vấn đề bảo mật.
-
-## Phát triển
-
-Dùng branch riêng và gắn mỗi thay đổi với một requirement hoặc issue. Trước khi mở pull request:
-
-```bash
-python -m pytest -q
+```text
+.
+├── docs/
+│   ├── api-spec.md
+│   ├── coding-rules.md
+│   ├── domain-model.md
+│   ├── recommendation.md
+│   └── specification.md
+├── src/
+│   └── hidden_link_checker/
+│       ├── models.py
+│       └── scanner.py
+├── tests/
+│   ├── integration/
+│   └── unit/
+├── pyproject.toml
+├── CONTRIBUTING.md
+└── README.md
 ```
 
-Pull request được kiểm tra bằng GitHub Actions và cần được review. Xem [CONTRIBUTING.md](CONTRIBUTING.md) để biết quy trình branch, review và các quy tắc riêng của dự án.
+## Đóng góp
 
-## Tài liệu
+Đọc [CONTRIBUTING.md](CONTRIBUTING.md) trước khi tạo branch hoặc pull request.
+Mọi thay đổi nên cập nhật test và tài liệu liên quan, đồng thời giữ đúng phạm
+vi link extraction, ownership và security policy của MVP.
 
-- [Khuyến nghị từ khách hàng](docs/recommendation.md)
-- [Đặc tả sản phẩm](docs/specification.md)
-- [Business requirements và acceptance criteria](docs/br-analysis.md)
-- [Context engineering pack](docs/context-engineering.md)
-- [Project scaffold](docs/project-scaffold.md)
+## Tài liệu tham khảo
 
-## Lộ trình
+- [Product recommendation](docs/recommendation.md)
+- [Product specification](docs/specification.md)
+- [API contract](docs/api-spec.md)
+- [Domain model](docs/domain-model.md)
+- [Coding rules](docs/coding-rules.md)
 
-1. Mở rộng fixture cho text, image, background, URL tương đối và HTML không hợp lệ.
-2. Thêm browser worker an toàn với snapshot đã render và bounding box của element.
-3. Tách riêng extractor, rule evaluator, persistence và API contract.
-4. Thêm authentication, lịch sử scan trong database và ownership enforcement.
-5. Xây dashboard grid, bộ lọc, bộ đếm và highlight trên snapshot.
-6. Thêm web rule management, import file theo mẫu, validation và versioning.
-7. Bổ sung security control production, observability, retention và rate limit.
+## Giấy phép
 
-## License
-
-Dự án hiện chưa chọn license. Cho đến khi có license chính thức, mọi quyền đều thuộc về chủ sở hữu bản quyền.
+Dự án hiện chưa chọn giấy phép. Cho đến khi có giấy phép chính thức, mọi quyền
+đều thuộc về chủ sở hữu bản quyền.

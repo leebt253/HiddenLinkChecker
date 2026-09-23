@@ -1,7 +1,7 @@
 ﻿# Coding Rules - Hidden Link Checker
 
-Tài liệu này áp dụng cho mã Python của Hidden Link Checker. Các rule phải hỗ trợ
-mục tiêu của sản phẩm: phát hiện URL ẩn có thể giải thích, bảo vệ an toàn khi
+Tài liệu này áp dụng cho mã Python của Hidden Link Checker. MVP tập trung vào
+phát hiện link thường và hidden link từ DOM của URL đầu vào, bảo vệ an toàn khi
 render URL và giữ dữ liệu đúng phạm vi tài khoản.
 
 ## 1. Nguyên tắc thiết kế
@@ -19,20 +19,19 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
   nhu cầu thực tế.
 - Tránh lặp code theo DRY, nhưng không gộp các logic khác mục đích chỉ để giảm
   số dòng.
-- Tách biệt rõ extractor, rule evaluator, persistence, API và UI contract như
-  specification yêu cầu.
-- Không dùng biến trạng thái toàn cục có thể thay đổi. Cấu hình rule và giới
-  hạn vận hành phải được truyền vào hoặc quản lý tập trung.
-- Không hard-code danh sách hoặc điều kiện rule kiểm tra lừa đảo trong source
-  code. Rule phải nằm trong file cấu hình theo schema/version đã xác định;
-  evaluator chỉ đọc và áp dụng cấu hình hợp lệ.
+- Tách biệt rõ extractor, persistence, API và UI contract như specification yêu
+  cầu.
+- Không dùng biến trạng thái toàn cục có thể thay đổi. Giới hạn vận hành phải
+  được truyền vào hoặc quản lý tập trung.
+- Không thêm rule đánh giá rủi ro hoặc severity vào MVP khi chưa có quyết định
+  scope mới.
 
 ## 2. Quy ước Python
 
 - Tuân thủ PEP 8 và cấu hình Ruff của dự án; giới hạn dòng là 100 ký tự.
 - Dùng `snake_case` cho module, function, method và biến; `PascalCase` cho
   class; `UPPER_SNAKE_CASE` cho hằng số.
-- Tên phải mô tả đúng nghiệp vụ, ví dụ `normalized_url`, `matched_rules` và
+- Tên phải mô tả đúng nghiệp vụ, ví dụ `normalized_url`, `actual_url` và
   `element_type`; không dùng tiền tố kiểu `g_` hoặc quy ước camelCase.
 - Dùng type hints cho public function, method, thuộc tính quan trọng và giá
   trị trả về. Ưu tiên kiểu cụ thể thay cho `Any`.
@@ -65,7 +64,7 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
 - Dùng docstring theo phong cách Python cho module, class và public function
   có contract hoặc hành vi không tầm thường; không dùng JSDoc hay JavaDoc.
 - Docstring cần nêu input, output, exception và side effect quan trọng.
-- Cập nhật documentation khi thay đổi contract của finding, severity, scan
+- Cập nhật documentation khi thay đổi contract của link result, link check
   lifecycle hoặc giới hạn bảo mật.
 
 ## 5. URL và an toàn khi scan
@@ -82,43 +81,34 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
 - Không log password, secret hoặc query string nhạy cảm. Lỗi network, timeout,
   403 và 429 phải được chuyển thành lỗi có kiểm soát, không làm API crash.
 
-## 6. Finding và rule evaluation
+## 6. Link extraction và result
 
-- Mỗi finding phải giữ `element_type`, `source_url`, `normalized_url` và bằng
-  chứng liên quan như visible text, alt text hoặc matched content.
-- `severity` chỉ nhận `safe`, `warning` hoặc `critical`; mỗi finding nhận đúng
-  một severity.
-- Rule phải được cấu hình tập trung, có tên ổn định và trả về `matched_rules`
-  cùng evidence/reason khi cần giải thích.
-- Rule configuration phải có thể được cập nhật qua web app với quyền
-  administrator và có chức năng import file theo mẫu được kiểm tra schema,
-  version, severity và nội dung điều kiện trước khi publish.
-- Lưu version rule được dùng cho mỗi scan để kết quả lịch sử vẫn giải thích và
-  tái lập được sau khi cấu hình thay đổi.
-- Rule gambling hoặc tín hiệu tương đương có thể tạo `critical`; destination
-  ngoài origin, redirect bất thường hoặc dữ liệu thiếu có thể tạo tối thiểu
-  `warning`.
-- Không diễn đạt `safe` như chứng nhận website an toàn. Đây chỉ là kết quả chưa
-  có rule rủi ro nào khớp trong phạm vi scan.
+- Mỗi link result phải giữ `element_type`, `object_reference`, `source_url`,
+  `actual_url` và `is_hidden`.
+- URL tương đối phải được resolve theo final URL của trang đầu vào.
+- `actual_url` chỉ là dữ liệu kết quả; không được fetch, mở hoặc điều hướng tới
+  link đã phát hiện.
+- Link thường và hidden link phải được phân biệt bằng thuộc tính DOM/object và
+  lưu nhất quán trong `is_hidden`.
 - Khi không thể đọc đầy đủ nội dung do JavaScript, iframe, CAPTCHA, login,
   timeout hoặc resource limit, ghi nhận `partial` và limitation thay vì đoán.
 
 ## 7. Bảo mật dữ liệu và ownership
 
-- Mọi truy vấn scan, finding và snapshot phải kiểm tra `authenticated user_id`.
-- Không trả hoặc xóa dữ liệu của user khác chỉ dựa trên `scan_id` do client gửi.
+- Mọi truy vấn link check và link result phải kiểm tra authenticated `user_id`.
+- Không trả hoặc xóa dữ liệu của user khác chỉ dựa trên `check_id` do client gửi.
 - Password phải được hash; không lưu hoặc log password dạng plain text.
-- Snapshot, URL và finding phải tuân thủ retention policy; việc xóa scan phải
-  xử lý dữ liệu liên quan theo cùng policy.
+- DOM, URL và link result phải tuân thủ retention policy; việc xóa link check
+  phải xử lý dữ liệu liên quan theo cùng policy.
 - Error response phải đủ hữu ích cho client nhưng không làm lộ secret, thông tin
   nội bộ hoặc dữ liệu của tài khoản khác.
 
 ## 8. Kiểm thử và chất lượng
 
-- Viết unit test riêng cho extractor, URL normalization, rule evaluator,
-  severity precedence và các policy bảo mật.
-- Viết integration test cho các lát dọc chính: scan an toàn một URL, trích xuất
-  text/image/background, đánh giá rule và chuyển trạng thái scan.
+- Viết unit test riêng cho extractor, URL normalization, phân biệt link thường/
+  hidden và các policy bảo mật.
+- Viết integration test cho các lát dọc chính: lấy DOM an toàn của một URL,
+  trích xuất text/image/background, lưu kết quả và chuyển trạng thái link check.
 - Kiểm thử cả trường hợp lỗi: URL không hợp lệ, redirect nguy hiểm, timeout,
   response lỗi, dữ liệu thiếu và kết quả `partial`.
 - Mỗi bug bảo mật hoặc regression của contract phải có test tái hiện trước hoặc
