@@ -14,7 +14,7 @@
 
 ## Scope và rủi ro
 
-- Có thay đổi scope trong `docs/idea.md` hoặc `docs/br-analysis.md` không?
+- Có thay đổi scope trong `docs/recommendation.md`, `docs/specification.md` hoặc `docs/br-analysis.md` không?
 - Có dữ liệu snapshot/URL nhạy cảm đi vào log hoặc artifact không?
 
 ## Checklist

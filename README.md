@@ -69,7 +69,8 @@ Mọi kết quả khác `safe` nên hiển thị tên rule và evidence dẫn t�
 ├── docs/
 │   ├── br-analysis.md             # Business requirements và acceptance criteria
 │   ├── context-engineering.md     # Context pack cho AI/team
-│   ├── idea.md                    # Ý tưởng sản phẩm và phạm vi MVP
+│   ├── recommendation.md         # Khuyến nghị sản phẩm từ góc nhìn khách hàng
+│   ├── specification.md          # Đặc tả sản phẩm và yêu cầu MVP
 │   └── project-scaffold.md        # Ghi chú scaffold của Lab 1.1
 ├── src/
 │   └── hidden_link_checker/
@@ -172,7 +173,8 @@ Pull request được kiểm tra bằng GitHub Actions và cần được review
 
 ## Tài liệu
 
-- [Ý tưởng sản phẩm và phạm vi MVP](docs/idea.md)
+- [Khuyến nghị từ khách hàng](docs/recommendation.md)
+- [Đặc tả sản phẩm](docs/specification.md)
 - [Business requirements và acceptance criteria](docs/br-analysis.md)
 - [Context engineering pack](docs/context-engineering.md)
 - [Project scaffold](docs/project-scaffold.md)

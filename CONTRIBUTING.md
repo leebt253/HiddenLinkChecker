@@ -10,7 +10,7 @@
 
 ## Nguyên tắc riêng của dự án
 
-- Không mở rộng scope khỏi finding text/image/background nếu chưa cập nhật `docs/idea.md` và BRD.
+- Không mở rộng scope khỏi finding text/image/background nếu chưa cập nhật `docs/recommendation.md`, `docs/specification.md` và BRD.
 - Không mô tả `safe` là chứng nhận an toàn tuyệt đối.
 - Mọi code nhận/render URL phải có SSRF và resource-limit consideration.
 - Mọi finding quan trọng cần có evidence và `matched_rules` để giải thích.
