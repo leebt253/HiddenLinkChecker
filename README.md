@@ -176,30 +176,7 @@ hotel_booking.result.json
 
 Output được tạo cùng thư mục với input và có hậu tố `.result.json`.
 
-Google OAuth credentials và cấu hình PostgreSQL sẽ được cung cấp qua biến môi
-trường khi web application được triển khai. Sao chép `.env.example` thành
-`.env` và điền giá trị triển khai thực tế; không commit tệp `.env`.
-
-### Cấu hình Google OAuth
-
-1. Tạo OAuth 2.0 Client ID loại Web application trong Google Cloud Console.
-2. Đăng ký Authorized redirect URI đúng bằng
-	`HIDDEN_LINK_CHECKER_GOOGLE_REDIRECT_URI`, mặc định là
-	`http://127.0.0.1:8000/v1/auth/google/callback`.
-3. Đặt `HIDDEN_LINK_CHECKER_GOOGLE_CLIENT_ID`,
-   `HIDDEN_LINK_CHECKER_GOOGLE_CLIENT_SECRET`,
-   `HIDDEN_LINK_CHECKER_DATABASE_URL` và `HIDDEN_LINK_CHECKER_WEB_BASE_URL`
-   trong `.env`. `HIDDEN_LINK_CHECKER_DATABASE_URL` phải theo dạng
-   `postgresql://user:password@localhost:5432/hidden_link_checker` vì ứng dụng
-   dùng `psycopg` trực tiếp.
-4. Khi deploy HTTPS, đặt `HIDDEN_LINK_CHECKER_SESSION_COOKIE_SECURE=true`.
-
-Áp dụng schema nền tảng trước, rồi migration session/OIDC:
-
-```powershell
-psql $env:HIDDEN_LINK_CHECKER_DATABASE_URL -v ON_ERROR_STOP=1 -f scripts/initial_schema.sql
-psql $env:HIDDEN_LINK_CHECKER_DATABASE_URL -v ON_ERROR_STOP=1 -f migrations/0002_auth_sessions.sql
-```
+Tax Calculation không phụ thuộc Google OAuth, PostgreSQL hoặc web server.
 
 ## Sử dụng
 
@@ -223,11 +200,10 @@ Sau đó, trong terminal khác, khởi động Web module:
 python -m uvicorn hidden_link_checker_web.main:app --host 127.0.0.1 --port 8001
 ```
 
-Web module chỉ gọi HTTP API qua `HIDDEN_LINK_CHECKER_API_BASE_URL`; không truy
-cập database hoặc import repository của API. Khi có
-`HIDDEN_LINK_CHECKER_DATABASE_URL`, API dùng PostgreSQL cho user, transaction
-OIDC và session. Cookie chỉ chứa opaque session token; API chỉ lưu hash token,
-không lưu Google access token hoặc refresh token.
+Web module chỉ gọi HTTP API qua cấu hình runtime; không truy cập database hoặc
+import repository của API. Khi được cấu hình database, API dùng PostgreSQL cho
+user, transaction OIDC và session. Cookie chỉ chứa opaque session token; API
+chỉ lưu hash token, không lưu Google access token hoặc refresh token.
 
 Mở `http://127.0.0.1:8001/login`, chọn **Đăng nhập với Google**, rồi hoàn tất
 Google sign-in. Callback sẽ tạo/cập nhật user theo `google_subject`, thiết lập
@@ -254,6 +230,12 @@ for link in links:
 Kết quả cho biết loại object, URL nguồn, URL sau khi resolve và `visibility`.
 
 ## Bảo mật
+
+Phần Tax Calculation không yêu cầu credential. Đối với phần Hidden Link Checker,
+các giá trị OAuth, database URL và session secret phải được cấp qua secret
+manager hoặc biến môi trường ở runtime. Không đưa client secret, mật khẩu,
+database URL thật hoặc file cấu hình local vào repository, README, log hay
+output JSON.
 
 URL người dùng nhập là một ranh giới bảo mật quan trọng. Implementation phải:
 
@@ -294,7 +276,6 @@ URL người dùng nhập là một ranh giới bảo mật quan trọng. Implem
 ├── tests/
 │   ├── integration/
 │   └── unit/
-├── .env.example
 ├── pyproject.toml
 ├── CONTRIBUTING.md
 └── README.md
