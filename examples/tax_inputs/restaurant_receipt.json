@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "has_header": true,
+    "column_mapping": {
+      "item_name": "menu_item",
+      "quantity": "count",
+      "unit_price": "price_krw",
+      "vat_rate": "tax_rate"
+    }
+  },
+  "data": [
+    {"menu_item": "Bibimbap", "count": 2, "price_krw": 11000, "tax_rate": "0.1", "table": "A12"},
+    {"menu_item": "Mineral water", "count": 2, "price_krw": 1500, "tax_rate": "0.1", "table": "A12"},
+    {"menu_item": "Kimchi pancake", "count": 1, "price_krw": 14000, "tax_rate": "0.1", "table": "A12"},
+    {"menu_item": "Seafood noodles", "count": 2, "price_krw": 13000, "tax_rate": "0.1", "table": "A12"},
+    {"menu_item": "Grilled pork", "count": 3, "price_krw": 17000, "tax_rate": "0.1", "table": "A12"},
+    {"menu_item": "Rice bowl", "count": 3, "price_krw": 2000, "tax_rate": "0.1", "table": "A12"},
+    {"menu_item": "Iced tea", "count": 2, "price_krw": 3500, "tax_rate": "0.1", "table": "A12"},
+    {"menu_item": "Mandu dumplings", "count": 1, "price_krw": 9000, "tax_rate": "0.1", "table": "A12"},
+    {"menu_item": "Green salad", "count": 1, "price_krw": 7500, "tax_rate": "0.1", "table": "A12"},
+    {"menu_item": "Fruit dessert", "count": 2, "price_krw": 5500, "tax_rate": "0.1", "table": "A12"}
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "items": [
+    {"item_name": "Wireless keyboard", "before_tax": "78000.00", "vat": "7800.00", "after_tax": "85800.00"},
+    {"item_name": "USB-C cable", "before_tax": "36000.00", "vat": "3600.00", "after_tax": "39600.00"},
+    {"item_name": "Laptop sleeve", "before_tax": "112000.00", "vat": "11200.00", "after_tax": "123200.00"},
+    {"item_name": "Wireless mouse", "before_tax": "110000.00", "vat": "11000.00", "after_tax": "121000.00"},
+    {"item_name": "HDMI adapter", "before_tax": "35000.00", "vat": "3500.00", "after_tax": "38500.00"},
+    {"item_name": "Notebook stand", "before_tax": "54000.00", "vat": "5400.00", "after_tax": "59400.00"},
+    {"item_name": "Webcam cover", "before_tax": "27000.00", "vat": "2700.00", "after_tax": "29700.00"},
+    {"item_name": "Desk lamp", "before_tax": "66000.00", "vat": "6600.00", "after_tax": "72600.00"},
+    {"item_name": "USB hub", "before_tax": "78000.00", "vat": "7800.00", "after_tax": "85800.00"},
+    {"item_name": "Screen cleaning kit", "before_tax": "34000.00", "vat": "3400.00", "after_tax": "37400.00"}
+  ],
+  "total_before_tax": "630000.00",
+  "total_after_tax": "693000.00"
+}

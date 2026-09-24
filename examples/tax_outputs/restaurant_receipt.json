@@ -1,0 +1,16 @@
+{
+  "items": [
+    {"item_name": "Bibimbap", "before_tax": "22000.00", "vat": "2200.00", "after_tax": "24200.00"},
+    {"item_name": "Mineral water", "before_tax": "3000.00", "vat": "300.00", "after_tax": "3300.00"},
+    {"item_name": "Kimchi pancake", "before_tax": "14000.00", "vat": "1400.00", "after_tax": "15400.00"},
+    {"item_name": "Seafood noodles", "before_tax": "26000.00", "vat": "2600.00", "after_tax": "28600.00"},
+    {"item_name": "Grilled pork", "before_tax": "51000.00", "vat": "5100.00", "after_tax": "56100.00"},
+    {"item_name": "Rice bowl", "before_tax": "6000.00", "vat": "600.00", "after_tax": "6600.00"},
+    {"item_name": "Iced tea", "before_tax": "7000.00", "vat": "700.00", "after_tax": "7700.00"},
+    {"item_name": "Mandu dumplings", "before_tax": "9000.00", "vat": "900.00", "after_tax": "9900.00"},
+    {"item_name": "Green salad", "before_tax": "7500.00", "vat": "750.00", "after_tax": "8250.00"},
+    {"item_name": "Fruit dessert", "before_tax": "11000.00", "vat": "1100.00", "after_tax": "12100.00"}
+  ],
+  "total_before_tax": "156500.00",
+  "total_after_tax": "172150.00"
+}

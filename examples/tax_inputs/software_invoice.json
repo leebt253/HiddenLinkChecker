@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "has_header": true,
+    "column_mapping": {
+      "item_name": "description",
+      "quantity": "seats",
+      "unit_price": "monthly_price_krw",
+      "vat_rate": "vat"
+    }
+  },
+  "data": [
+    {"description": "Project management subscription", "seats": 12, "monthly_price_krw": 18000, "vat": "0.1", "billing_period": "2026-09"},
+    {"description": "Priority support", "seats": 1, "monthly_price_krw": 75000, "vat": "0.1", "billing_period": "2026-09"},
+    {"description": "Time tracking add-on", "seats": 8, "monthly_price_krw": 9000, "vat": "0.1", "billing_period": "2026-09"},
+    {"description": "Document storage add-on", "seats": 5, "monthly_price_krw": 12000, "vat": "0.1", "billing_period": "2026-09"},
+    {"description": "Analytics dashboard", "seats": 3, "monthly_price_krw": 25000, "vat": "0.1", "billing_period": "2026-09"},
+    {"description": "Security audit report", "seats": 1, "monthly_price_krw": 180000, "vat": "0.1", "billing_period": "2026-09"},
+    {"description": "API usage package", "seats": 4, "monthly_price_krw": 35000, "vat": "0.1", "billing_period": "2026-09"},
+    {"description": "Training workshop", "seats": 2, "monthly_price_krw": 220000, "vat": "0.1", "billing_period": "2026-09"},
+    {"description": "Data export service", "seats": 1, "monthly_price_krw": 65000, "vat": "0.1", "billing_period": "2026-09"},
+    {"description": "Custom integration", "seats": 1, "monthly_price_krw": 450000, "vat": "0.1", "billing_period": "2026-09"}
+  ]
+}

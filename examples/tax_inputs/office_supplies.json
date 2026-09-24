@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "has_header": true,
+    "column_mapping": {
+      "item_name": "description",
+      "quantity": "packs",
+      "unit_price": "price_krw",
+      "vat_rate": "tax"
+    }
+  },
+  "data": [
+    {"description": "A4 copy paper", "packs": 50, "price_krw": 4800, "tax": "0.1", "department": "Operations"},
+    {"description": "Blue ballpoint pens", "packs": 20, "price_krw": 6500, "tax": "0.1", "department": "Sales"},
+    {"description": "Permanent markers", "packs": 12, "price_krw": 9200, "tax": "0.1", "department": "Warehouse"},
+    {"description": "Document folders", "packs": 30, "price_krw": 3500, "tax": "0.1", "department": "HR"},
+    {"description": "Desk calendar", "packs": 15, "price_krw": 7800, "tax": "0.1", "department": "Finance"},
+    {"description": "Whiteboard eraser", "packs": 10, "price_krw": 4200, "tax": "0.1", "department": "Operations"},
+    {"description": "Stapler", "packs": 8, "price_krw": 11500, "tax": "0.1", "department": "HR"},
+    {"description": "Binder clips", "packs": 25, "price_krw": 2800, "tax": "0.1", "department": "Finance"},
+    {"description": "Shipping labels", "packs": 40, "price_krw": 3100, "tax": "0.1", "department": "Warehouse"},
+    {"description": "USB flash drive", "packs": 10, "price_krw": 13500, "tax": "0.1", "department": "IT"}
+  ]
+}

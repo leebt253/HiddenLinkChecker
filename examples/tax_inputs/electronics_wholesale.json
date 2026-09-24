@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "has_header": true,
+    "column_mapping": {
+      "item_name": "model",
+      "quantity": "units",
+      "unit_price": "wholesale_price_krw",
+      "vat_rate": "vat"
+    }
+  },
+  "data": [
+    {"model": "24-inch office monitor", "units": 10, "wholesale_price_krw": 185000, "vat": "0.1", "order_line": "ELEC-001"},
+    {"model": "27-inch office monitor", "units": 8, "wholesale_price_krw": 245000, "vat": "0.1", "order_line": "ELEC-002"},
+    {"model": "USB-C docking station", "units": 12, "wholesale_price_krw": 129000, "vat": "0.1", "order_line": "ELEC-003"},
+    {"model": "Wireless mouse", "units": 30, "wholesale_price_krw": 22000, "vat": "0.1", "order_line": "ELEC-004"},
+    {"model": "Mechanical keyboard", "units": 20, "wholesale_price_krw": 68000, "vat": "0.1", "order_line": "ELEC-005"},
+    {"model": "Webcam", "units": 15, "wholesale_price_krw": 79000, "vat": "0.1", "order_line": "ELEC-006"},
+    {"model": "Noise cancelling headset", "units": 10, "wholesale_price_krw": 155000, "vat": "0.1", "order_line": "ELEC-007"},
+    {"model": "Portable SSD 1TB", "units": 14, "wholesale_price_krw": 98000, "vat": "0.1", "order_line": "ELEC-008"},
+    {"model": "Power strip", "units": 25, "wholesale_price_krw": 19000, "vat": "0.1", "order_line": "ELEC-009"},
+    {"model": "Laptop stand", "units": 18, "wholesale_price_krw": 43000, "vat": "0.1", "order_line": "ELEC-010"}
+  ]
+}

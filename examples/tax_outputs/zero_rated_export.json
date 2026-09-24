@@ -1,0 +1,16 @@
+{
+  "items": [
+    {"item_name": "International design consulting", "before_tax": "1250000.00", "vat": "0.00", "after_tax": "1250000.00"},
+    {"item_name": "Localization review", "before_tax": "340000.00", "vat": "0.00", "after_tax": "340000.00"},
+    {"item_name": "Remote UX research", "before_tax": "570000.00", "vat": "0.00", "after_tax": "570000.00"},
+    {"item_name": "Export market analysis", "before_tax": "720000.00", "vat": "0.00", "after_tax": "720000.00"},
+    {"item_name": "English copywriting", "before_tax": "840000.00", "vat": "0.00", "after_tax": "840000.00"},
+    {"item_name": "International SEO review", "before_tax": "550000.00", "vat": "0.00", "after_tax": "550000.00"},
+    {"item_name": "Overseas campaign planning", "before_tax": "760000.00", "vat": "0.00", "after_tax": "760000.00"},
+    {"item_name": "Foreign language testing", "before_tax": "496000.00", "vat": "0.00", "after_tax": "496000.00"},
+    {"item_name": "Global accessibility audit", "before_tax": "580000.00", "vat": "0.00", "after_tax": "580000.00"},
+    {"item_name": "International presentation", "before_tax": "520000.00", "vat": "0.00", "after_tax": "520000.00"}
+  ],
+  "total_before_tax": "6626000.00",
+  "total_after_tax": "6626000.00"
+}

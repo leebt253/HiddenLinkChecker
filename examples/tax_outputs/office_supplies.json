@@ -1,0 +1,16 @@
+{
+  "items": [
+    {"item_name": "A4 copy paper", "before_tax": "240000.00", "vat": "24000.00", "after_tax": "264000.00"},
+    {"item_name": "Blue ballpoint pens", "before_tax": "130000.00", "vat": "13000.00", "after_tax": "143000.00"},
+    {"item_name": "Permanent markers", "before_tax": "110400.00", "vat": "11040.00", "after_tax": "121440.00"},
+    {"item_name": "Document folders", "before_tax": "105000.00", "vat": "10500.00", "after_tax": "115500.00"},
+    {"item_name": "Desk calendar", "before_tax": "117000.00", "vat": "11700.00", "after_tax": "128700.00"},
+    {"item_name": "Whiteboard eraser", "before_tax": "42000.00", "vat": "4200.00", "after_tax": "46200.00"},
+    {"item_name": "Stapler", "before_tax": "92000.00", "vat": "9200.00", "after_tax": "101200.00"},
+    {"item_name": "Binder clips", "before_tax": "70000.00", "vat": "7000.00", "after_tax": "77000.00"},
+    {"item_name": "Shipping labels", "before_tax": "124000.00", "vat": "12400.00", "after_tax": "136400.00"},
+    {"item_name": "USB flash drive", "before_tax": "135000.00", "vat": "13500.00", "after_tax": "148500.00"}
+  ],
+  "total_before_tax": "1165400.00",
+  "total_after_tax": "1281940.00"
+}

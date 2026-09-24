@@ -95,12 +95,48 @@ Cài đặt project và công cụ test:
 
 ```bash
 python -m pip install --upgrade pip
-python -m pip install -e .
-python -m pip install pytest
+python -m pip install -e ".[dev]"
 ```
 
+### Tích hợp TaxCalculationLibrary
+
+Build và cài thư viện tính thuế sibling project trước khi chạy module tích hợp:
+
+```powershell
+Push-Location ..\TaxCalculationLibrary
+python -m pip install -e ".[test]"
+Pop-Location
+```
+
+Module `hidden_link_checker_api.services.tax_calculation` cung cấp
+`calculate_tax(data, metadata)` và `calculate_tax_file(path)`. Mười input JSON mẫu
+với tối thiểu 10 dòng mỗi file nằm trong `examples/tax_inputs/`; output tương ứng
+nằm trong `examples/tax_outputs/`.
+
 Google OAuth credentials và cấu hình PostgreSQL sẽ được cung cấp qua biến môi
-trường khi web application được triển khai.
+trường khi web application được triển khai. Sao chép `.env.example` thành
+`.env` và điền giá trị triển khai thực tế; không commit tệp `.env`.
+
+### Cấu hình Google OAuth
+
+1. Tạo OAuth 2.0 Client ID loại Web application trong Google Cloud Console.
+2. Đăng ký Authorized redirect URI đúng bằng
+	`HIDDEN_LINK_CHECKER_GOOGLE_REDIRECT_URI`, mặc định là
+	`http://127.0.0.1:8000/v1/auth/google/callback`.
+3. Đặt `HIDDEN_LINK_CHECKER_GOOGLE_CLIENT_ID`,
+   `HIDDEN_LINK_CHECKER_GOOGLE_CLIENT_SECRET`,
+   `HIDDEN_LINK_CHECKER_DATABASE_URL` và `HIDDEN_LINK_CHECKER_WEB_BASE_URL`
+   trong `.env`. `HIDDEN_LINK_CHECKER_DATABASE_URL` phải theo dạng
+   `postgresql://user:password@localhost:5432/hidden_link_checker` vì ứng dụng
+   dùng `psycopg` trực tiếp.
+4. Khi deploy HTTPS, đặt `HIDDEN_LINK_CHECKER_SESSION_COOKIE_SECURE=true`.
+
+Áp dụng schema nền tảng trước, rồi migration session/OIDC:
+
+```powershell
+psql $env:HIDDEN_LINK_CHECKER_DATABASE_URL -v ON_ERROR_STOP=1 -f scripts/initial_schema.sql
+psql $env:HIDDEN_LINK_CHECKER_DATABASE_URL -v ON_ERROR_STOP=1 -f migrations/0002_auth_sessions.sql
+```
 
 ## Sử dụng
 
@@ -109,6 +145,31 @@ trường khi web application được triển khai.
 ```bash
 python -m pytest -q
 ```
+
+### Chạy hai module độc lập
+
+Khởi động API trước:
+
+```bash
+python -m uvicorn hidden_link_checker_api.main:app --host 127.0.0.1 --port 8000
+```
+
+Sau đó, trong terminal khác, khởi động Web module:
+
+```bash
+python -m uvicorn hidden_link_checker_web.main:app --host 127.0.0.1 --port 8001
+```
+
+Web module chỉ gọi HTTP API qua `HIDDEN_LINK_CHECKER_API_BASE_URL`; không truy
+cập database hoặc import repository của API. Khi có
+`HIDDEN_LINK_CHECKER_DATABASE_URL`, API dùng PostgreSQL cho user, transaction
+OIDC và session. Cookie chỉ chứa opaque session token; API chỉ lưu hash token,
+không lưu Google access token hoặc refresh token.
+
+Mở `http://127.0.0.1:8001/login`, chọn **Đăng nhập với Google**, rồi hoàn tất
+Google sign-in. Callback sẽ tạo/cập nhật user theo `google_subject`, thiết lập
+server-side session và chuyển tới `http://127.0.0.1:8001/welcome` để hiển thị
+tên profile. API cung cấp `GET /v1/me` và `POST /v1/auth/logout` cho web module.
 
 ### Thử core trích xuất
 
@@ -155,12 +216,22 @@ URL người dùng nhập là một ranh giới bảo mật quan trọng. Implem
 │   ├── recommendation.md
 │   └── specification.md
 ├── src/
-│   └── hidden_link_checker/
-│       ├── models.py
-│       └── scanner.py
+│   ├── hidden_link_checker_api/
+│   │   ├── controllers/      # HTTP API
+│   │   ├── domain/           # entities và lifecycle
+│   │   ├── repositories/     # persistence ports/adapters
+│   │   ├── scanner/          # URL policy, SSRF và extractor
+│   │   ├── services/         # use cases
+│   │   └── workers/          # queue/worker ports
+│   ├── hidden_link_checker_web/
+│   │   ├── controllers/      # dashboard routes
+│   │   ├── services/         # HTTP API client
+│   │   └── views/            # HTML rendering
+│   └── shared_contracts/     # versioned API DTOs
 ├── tests/
 │   ├── integration/
 │   └── unit/
+├── .env.example
 ├── pyproject.toml
 ├── CONTRIBUTING.md
 └── README.md
@@ -179,6 +250,7 @@ vi link extraction, ownership và security policy của MVP.
 - [API contract](docs/api-spec.md)
 - [Domain model](docs/domain-model.md)
 - [PostgreSQL database guide](docs/database-guide.md)
+- [Database connection configuration](docs/database-connection.md)
 - [Coding rules](docs/coding-rules.md)
 
 ## Giấy phép

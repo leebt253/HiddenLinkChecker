@@ -1,0 +1,16 @@
+{
+  "items": [
+    {"item_name": "Local parcel delivery", "before_tax": "112500.00", "vat": "11250.00", "after_tax": "123750.00"},
+    {"item_name": "Express parcel delivery", "before_tax": "102000.00", "vat": "10200.00", "after_tax": "112200.00"},
+    {"item_name": "Pallet storage", "before_tax": "256000.00", "vat": "25600.00", "after_tax": "281600.00"},
+    {"item_name": "Cold-chain handling", "before_tax": "288000.00", "vat": "28800.00", "after_tax": "316800.00"},
+    {"item_name": "Customs documentation", "before_tax": "260000.00", "vat": "26000.00", "after_tax": "286000.00"},
+    {"item_name": "International air freight", "before_tax": "840000.00", "vat": "84000.00", "after_tax": "924000.00"},
+    {"item_name": "Container unloading", "before_tax": "460000.00", "vat": "46000.00", "after_tax": "506000.00"},
+    {"item_name": "Returns processing", "before_tax": "129600.00", "vat": "12960.00", "after_tax": "142560.00"},
+    {"item_name": "Insurance surcharge", "before_tax": "80500.00", "vat": "8050.00", "after_tax": "88550.00"},
+    {"item_name": "Oversize handling", "before_tax": "243000.00", "vat": "24300.00", "after_tax": "267300.00"}
+  ],
+  "total_before_tax": "2771600.00",
+  "total_after_tax": "3048760.00"
+}
