@@ -53,6 +53,10 @@ class LinkCheckResponse(BaseModel):
     created_at: datetime
     completed_at: datetime | None
     links: list[LinkResultResponse]
+    total_links: int = 0
+    page: int = 1
+    page_size: int = 20
+    total_pages: int = 0
 
 
 class LinkCheckHistoryItem(BaseModel):

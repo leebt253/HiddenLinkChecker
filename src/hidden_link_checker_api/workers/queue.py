@@ -1,5 +1,7 @@
-"""Queue boundary separating API request handling from browser processing."""
+"""Queue boundary separating API request handling from link processing."""
 
+from collections.abc import Callable
+from threading import Thread
 from typing import Protocol
 from uuid import UUID
 
@@ -12,10 +14,13 @@ class LinkCheckQueue(Protocol):
 
 
 class InMemoryLinkCheckQueue:
-    """Development adapter that records jobs without navigating to any URL."""
+    """Development queue that processes jobs in daemon background threads."""
 
-    def __init__(self) -> None:
+    def __init__(self, processor: Callable[[UUID], None] | None = None) -> None:
         self.enqueued_check_ids: list[UUID] = []
+        self._processor = processor
 
     def enqueue(self, check_id: UUID) -> None:
         self.enqueued_check_ids.append(check_id)
+        if self._processor is not None:
+            Thread(target=self._processor, args=(check_id,), daemon=True).start()

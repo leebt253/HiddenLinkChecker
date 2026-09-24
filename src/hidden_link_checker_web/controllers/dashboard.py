@@ -53,8 +53,14 @@ async def create_link_check(
 @router.get("/link-checks/{check_id}", response_class=HTMLResponse)
 async def link_check_detail(check_id: UUID, request: Request) -> HTMLResponse:
     """Show the result data returned by the API."""
+    page = int(request.query_params.get("page", "1"))
+    page_size = int(request.query_params.get("page_size", "20"))
+    page = max(page, 1)
+    page_size = min(max(page_size, 20), 100)
     try:
-        link_check = await _api_client(request).get_link_check(check_id, request.cookies)
+        link_check = await _api_client(request).get_link_check(
+            check_id, request.cookies, page=page, page_size=page_size
+        )
     except httpx.HTTPStatusError as error:
         raise HTTPException(status_code=error.response.status_code, detail=error.response.text) from error
     return HTMLResponse(render_link_check(link_check))

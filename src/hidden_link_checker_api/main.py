@@ -19,6 +19,7 @@ from hidden_link_checker_api.services.auth import (
     GoogleOAuthClient,
 )
 from hidden_link_checker_api.services.link_checks import LinkCheckService
+from hidden_link_checker_api.workers.link_check_worker import LinkCheckWorker
 from hidden_link_checker_api.workers.queue import InMemoryLinkCheckQueue
 
 
@@ -28,9 +29,11 @@ def create_app(settings: ApiSettings | None = None, auth_repository: AuthReposit
     app = FastAPI(title="Hidden Link Checker API", version="0.1.0")
     app.state.settings = resolved_settings
     app.state.authentication_service = _build_authentication_service(resolved_settings, auth_repository)
+    link_check_repository = InMemoryLinkCheckRepository()
+    link_check_worker = LinkCheckWorker(link_check_repository)
     app.state.link_check_service = LinkCheckService(
-        repository=InMemoryLinkCheckRepository(),
-        queue=InMemoryLinkCheckQueue(),
+        repository=link_check_repository,
+        queue=InMemoryLinkCheckQueue(link_check_worker.process),
     )
     app.include_router(auth_router)
     app.include_router(link_checks_router)

@@ -2,8 +2,11 @@
 
 from html import escape
 
-from shared_contracts.api_models import CurrentUserResponse, LinkCheckHistoryItem, LinkCheckResponse
-
+from shared_contracts.api_models import (
+    CurrentUserResponse,
+    LinkCheckHistoryItem,
+    LinkCheckResponse,
+)
 
 _STYLE = """
 <style>
@@ -55,7 +58,7 @@ a { color: inherit; }
 .url-form input[type=url]:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(11, 119, 114, .12); }
 .check-option { display: flex; align-items: center; gap: 9px; color: var(--muted); font: 14px Arial, sans-serif; }
 .check-option input { accent-color: var(--teal); }
-.stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 22px; }
+.stats { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-top: 22px; }
 .stat { padding: 18px; background: #e4f0ec; }
 .stat strong { display: block; margin-top: 6px; font-size: 30px; }
 .history { margin-top: 22px; }
@@ -71,16 +74,21 @@ a { color: inherit; }
 .welcome-panel { max-width: 620px; margin: 12vh auto; text-align: center; }
 .welcome-panel .primary-button { width: auto; padding-left: 32px; padding-right: 32px; }
 .result-table { width: 100%; margin-top: 22px; border-collapse: collapse; font: 13px Arial, sans-serif; }
+.results-scroll { max-width: 100%; max-height: 520px; margin-top: 22px; overflow: auto; padding: 4px; border: 1px solid var(--line); }
+.results-scroll .result-table { margin-top: 0; min-width: 760px; }
 .result-table th, .result-table td { padding: 12px 10px; border-bottom: 1px solid var(--line); text-align: left; }
 .result-table th { color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; font: 13px Arial, sans-serif; }
+.pagination a, .pagination select { padding: 8px 10px; border: 1px solid var(--line); color: var(--teal-dark); background: var(--white); text-decoration: none; }
+.pagination select { cursor: pointer; }
 .back-link { display: inline-block; margin-top: 26px; color: var(--teal-dark); font: 700 13px Arial, sans-serif; text-decoration: none; }
 @media (max-width: 800px) { .login-shell, .workspace { grid-template-columns: 1fr; } .login-copy h1 { font-size: 54px; } .dashboard-heading { display: block; } .dashboard-heading p { margin-top: 18px; } .topbar, .page-content, .login-shell { padding-left: 20px; padding-right: 20px; } .auth-panel { padding: 28px; } }
 </style>
 """
 
 
-def _document(title: str, body: str) -> str:
-    return f'<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{escape(title)}</title>{_STYLE}</head><body>{body}</body></html>'
+def _document(title: str, body: str, head: str = "") -> str:
+    return f'<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{escape(title)}</title>{head}{_STYLE}</head><body>{body}</body></html>'
 
 
 def _brand() -> str:
@@ -133,7 +141,7 @@ def render_dashboard(history: list[LinkCheckHistoryItem], user: CurrentUserRespo
         '<button class="primary-button" type="submit">Start inspection</button></form></div>'
         '<aside class="panel"><span class="eyebrow">Workspace pulse</span><div class="stats">'
         f'<div class="stat"><span class="muted">Checks</span><strong>{len(history)}</strong></div>'
-        '<div class="stat"><span class="muted">Account</span><strong>OK</strong></div></div>'
+        '</div>'
         f'<div class="history"><h2>Recent checks</h2>{history_html}</div></aside></section></main></div>'
     )
     return _document("Dashboard - Hidden Link Checker", body)
@@ -150,14 +158,54 @@ def render_link_check(link_check: LinkCheckResponse) -> str:
         "</tr>"
         for link in link_check.links
     )
+    is_processing = link_check.status in {"queued", "running"}
+    refresh_head = '<meta http-equiv="refresh" content="2">' if is_processing else ""
+    links_summary = (
+        f'<p class="muted">{len(link_check.links)} hidden link(s) found.</p>'
+        if link_check.links
+        else '<p class="muted">No hidden links found in the readable page content.</p>'
+    )
+    limitations = "".join(f"<li>{escape(item)}</li>" for item in link_check.limitations)
+    limitations_block = (
+        f'<div class="limitations"><strong>Limitations</strong><ul>{limitations}</ul></div>'
+        if limitations
+        else ""
+    )
+    results_table = (
+        '<div class="results-scroll"><table class="result-table"><thead><tr><th>Type</th><th>Visibility</th><th>Source</th><th>Actual URL</th></tr></thead>'
+        f'<tbody>{rows}</tbody></table></div>'
+        if rows
+        else ""
+    )
+    pagination = ""
+    if link_check.total_pages > 1:
+        previous = (
+            f'<a href="?page={link_check.page - 1}&page_size={link_check.page_size}">Previous</a>'
+            if link_check.page > 1
+            else ""
+        )
+        next_page = (
+            f'<a href="?page={link_check.page + 1}&page_size={link_check.page_size}">Next</a>'
+            if link_check.page < link_check.total_pages
+            else ""
+        )
+        pagination = (
+            f'<nav class="pagination" aria-label="Inspection result pages">{previous}'
+            f'<span>Page {link_check.page} of {link_check.total_pages} · {link_check.total_links} results</span>'
+            f'{next_page}<label>Rows <select onchange="location.href=\'?page=1&page_size=\' + this.value">'
+            + "".join(
+                f'<option value="{size}"{" selected" if size == link_check.page_size else ""}>{size}</option>'
+                for size in (20, 50, 100)
+            )
+            + "</select></label></nav>"
+        )
     body = (
         '<div class="site-shell"><header class="topbar">'
         f'{_brand()}</header><main class="page-content"><section class="panel">'
         f'<span class="eyebrow">Inspection / {escape(link_check.status)}</span>'
         f'<h1 class="inspection-title">Inspection result</h1>'
         f'<label class="inspection-url">Submitted URL<input type="text" value="{escape(link_check.submitted_url, quote=True)}" readonly></label>'
-        '<table class="result-table"><thead><tr><th>Type</th><th>Visibility</th><th>Source</th><th>Actual URL</th></tr></thead>'
-        f'<tbody>{rows}</tbody></table><a class="back-link" href="/">Back to dashboard</a>'
+        f'{links_summary}{limitations_block}{results_table}{pagination}<a class="back-link" href="/">Back to dashboard</a>'
         '</section></main></div>'
     )
-    return _document("Inspection - Hidden Link Checker", body)
+    return _document("Inspection - Hidden Link Checker", body, refresh_head)

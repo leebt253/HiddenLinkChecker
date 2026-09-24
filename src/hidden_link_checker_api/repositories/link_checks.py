@@ -16,6 +16,9 @@ class LinkCheckRepository(Protocol):
     def get_owned(self, user_id: UUID, check_id: UUID) -> LinkCheck | None:
         """Return a link check only when it belongs to the requesting user."""
 
+    def get_by_id(self, check_id: UUID) -> LinkCheck | None:
+        """Return a link check for the internal worker by identifier."""
+
     def list_owned(self, user_id: UUID) -> list[LinkCheck]:
         """Return the requesting user's checks in reverse creation order."""
 
@@ -38,6 +41,9 @@ class InMemoryLinkCheckRepository:
         if check_id not in self._checks_by_user[user_id]:
             return None
         return self._checks[check_id]
+
+    def get_by_id(self, check_id: UUID) -> LinkCheck | None:
+        return self._checks.get(check_id)
 
     def list_owned(self, user_id: UUID) -> list[LinkCheck]:
         checks = [self._checks[check_id] for check_id in self._checks_by_user[user_id]]

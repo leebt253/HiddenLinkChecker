@@ -38,10 +38,14 @@ class HiddenLinkCheckerApiClient:
         response.raise_for_status()
         return [LinkCheckHistoryItem.model_validate(item) for item in response.json()]
 
-    async def get_link_check(self, check_id: UUID, cookies: Mapping[str, str]) -> LinkCheckResponse:
+    async def get_link_check(
+        self, check_id: UUID, cookies: Mapping[str, str], page: int = 1, page_size: int = 20
+    ) -> LinkCheckResponse:
         """Load one link check visible to the current user."""
         async with httpx.AsyncClient(base_url=self._base_url, cookies=cookies) as client:
-            response = await client.get(f"/v1/link-checks/{check_id}")
+            response = await client.get(
+                f"/v1/link-checks/{check_id}", params={"page": page, "page_size": page_size}
+            )
         response.raise_for_status()
         return LinkCheckResponse.model_validate(response.json())
 

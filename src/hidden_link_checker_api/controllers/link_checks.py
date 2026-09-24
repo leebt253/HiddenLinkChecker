@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
 from hidden_link_checker_api.domain.models import AuthenticatedUser, LinkCheck
 from hidden_link_checker_api.scanner.urls import InvalidInputUrlError
@@ -36,7 +36,11 @@ def get_link_check_service(request: Request) -> LinkCheckService:
     return request.app.state.link_check_service
 
 
-def _to_response(link_check: LinkCheck) -> LinkCheckResponse:
+def _to_response(link_check: LinkCheck, page: int, page_size: int) -> LinkCheckResponse:
+    total_links = len(link_check.links)
+    start = (page - 1) * page_size
+    page_links = link_check.links[start : start + page_size]
+    total_pages = (total_links + page_size - 1) // page_size if total_links else 0
     return LinkCheckResponse(
         check_id=link_check.id,
         status=link_check.status.value,
@@ -59,8 +63,12 @@ def _to_response(link_check: LinkCheck) -> LinkCheckResponse:
                 alt_text=result.alt_text,
                 position=result.position,
             )
-            for result in link_check.links
+            for result in page_links
         ],
+        total_links=total_links,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
     )
 
 
@@ -103,6 +111,8 @@ def list_link_checks(
 @router.get("/link-checks/{check_id}", response_model=LinkCheckResponse)
 def get_link_check(
     check_id: UUID,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=20, le=100),
     user: AuthenticatedUser = Depends(get_current_user),
     service: LinkCheckService = Depends(get_link_check_service),
 ) -> LinkCheckResponse:
@@ -110,7 +120,7 @@ def get_link_check(
     link_check = service.get(user, check_id)
     if link_check is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Link check not found.")
-    return _to_response(link_check)
+    return _to_response(link_check, page, page_size)
 
 
 @router.delete("/link-checks/{check_id}", status_code=status.HTTP_204_NO_CONTENT)
