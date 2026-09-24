@@ -59,7 +59,15 @@ def _default_auth_repository(settings: ApiSettings) -> AuthRepository:
 
 
 def _google_credentials_are_configured(settings: ApiSettings) -> bool:
-    return all((settings.google_client_id, settings.google_client_secret, settings.google_redirect_uri))
+    return all(_is_configured_google_setting(value) for value in (
+        settings.google_client_id,
+        settings.google_client_secret,
+        settings.google_redirect_uri,
+    ))
+
+
+def _is_configured_google_setting(value: str | None) -> bool:
+    return bool(value and not value.startswith("replace-with-"))
 
 
 app = create_app()

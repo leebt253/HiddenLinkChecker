@@ -188,6 +188,16 @@ python -m pytest -q
 
 ### Chạy hai module độc lập
 
+Để thử Google OAuth local mà chưa có PostgreSQL, mở terminal chạy API với
+in-memory authentication:
+
+```powershell
+$env:HIDDEN_LINK_CHECKER_DATABASE_URL = ""
+.venv\Scripts\python.exe -m uvicorn hidden_link_checker_api.main:app --host 127.0.0.1 --port 8000
+```
+
+Trong terminal khác, chạy Web module:
+
 Khởi động API trước:
 
 ```bash

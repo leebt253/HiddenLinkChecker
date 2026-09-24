@@ -64,3 +64,17 @@ def test_logout_revokes_session_and_clears_cookie() -> None:
     assert response.status_code == 204
     assert service.revoked_tokens == ["valid-session"]
     assert "session=" in response.headers["set-cookie"]
+
+
+def test_google_login_rejects_placeholder_credentials() -> None:
+    settings = ApiSettings(
+        google_client_id="replace-with-google-oauth-client-id",
+        google_client_secret="replace-with-google-oauth-client-secret",
+        google_redirect_uri="http://127.0.0.1:8000/v1/auth/google/callback",
+    )
+    client = TestClient(create_app(settings))
+
+    response = client.get("/v1/auth/google/start")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Google sign-in is not configured."
