@@ -51,9 +51,9 @@ Hiển thị và lưu hidden link theo user
 	`indirect` nếu nằm sau image, background hoặc object khác.
 - Resolve URL tương đối theo URL cuối cùng của trang đầu vào.
 - Hiển thị URL nguồn, URL thực tế, loại object và thông tin element.
-- Lưu kết quả theo user và tải lại lịch sử kiểm tra.
+- Lưu URL và thời điểm kiểm tra theo user để tải lại lịch sử.
 - API-first: authentication, tạo, đọc, cập nhật và xóa dữ liệu đều đi qua API.
-- PostgreSQL làm database chính cho user, link check và link result.
+- PostgreSQL làm database chính cho user, auth session và URL history.
 
 ## Kiến trúc và công nghệ
 
@@ -187,6 +187,23 @@ python -m pytest -q
 ```
 
 ### Chạy hai module độc lập
+
+Khởi tạo PostgreSQL và chạy API trên Windows:
+
+```cmd
+set HIDDEN_LINK_CHECKER_DATABASE_URL=postgresql://user:password@localhost:5432/hidden_link_checker
+scripts\start_api.cmd
+```
+
+`start_api.cmd` áp dụng `scripts/initial_schema.sql` và các migration chưa chạy
+trước khi mở API. Script sẽ dừng nếu thiếu `HIDDEN_LINK_CHECKER_DATABASE_URL`,
+để tránh chạy nhầm bằng persistence in-memory và mất dữ liệu sau khi restart.
+
+Mở terminal khác để chạy web server:
+
+```cmd
+scripts\start_server.cmd
+```
 
 Để thử Google OAuth local mà chưa có PostgreSQL, mở terminal chạy API với
 in-memory authentication:

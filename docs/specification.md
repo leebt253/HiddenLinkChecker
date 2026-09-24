@@ -11,16 +11,16 @@
 ## 2. Product objective
 
 Cho phép người dùng đăng nhập bằng Google, gửi một URL qua API, lấy DOM trong
-browser worker cô lập, phát hiện các hidden link từ text/image/background và
-trả kết quả qua API. System không tự động mở hoặc request tới hidden link được
-phát hiện.
+worker cô lập, phát hiện hidden link từ text/image/background và trả kết quả
+trong thời gian xử lý. Database chỉ lưu URL và thời điểm check; không lưu DOM
+hoặc hidden-link results. System không tự động mở hoặc request tới hidden link.
 
 ## 3. Actors
 
 | Actor | Quyền và trách nhiệm |
 |---|---|
 | Unauthenticated user | Đăng nhập bằng Google |
-| Authenticated user | Tạo, xem, cập nhật metadata và xóa lần kiểm tra của mình |
+| Authenticated user | Tạo, xem và xóa lịch sử URL của mình |
 | Link processor | Fetch/render URL đầu vào trong sandbox, lấy DOM và parse hidden link |
 | System administrator | Quản lý giới hạn vận hành và retention nếu cần |
 
@@ -79,7 +79,7 @@ chạy rule engine.
 URL tương đối phải được chuẩn hóa theo URL cuối cùng của trang. Mỗi link result
 phải giữ URL nguồn và URL thực tế.
 
-### FR-005 Link result contract
+### FR-005 Link result contract (ephemeral)
 
 ```json
 {
@@ -97,6 +97,8 @@ phải giữ URL nguồn và URL thực tế.
 ```
 
 `position` có thể là `null` nếu element không render được hoặc không lấy được bounding box.
+Contract này chỉ phục vụ response/dashboard trong phiên xử lý; không có bảng
+database lưu `LinkResult`.
 
 ### FR-006 Link check result and dashboard
 
@@ -122,15 +124,14 @@ queued -> running -> completed
 - `partial`: có kết quả nhưng một phần nội dung không đọc được hoặc bị giới hạn.
 - `failed`: không tạo được kết quả usable do lỗi validation, network hoặc worker.
 
-Link check phải lưu `created_at`, `completed_at`, lỗi có kiểm soát và giới hạn gặp phải.
+Trạng thái và limitation chỉ tồn tại trong phiên xử lý; database chỉ lưu
+`url_checks.checked_at`.
 
 ### FR-008 History and CRUD
 
-User có thể xem danh sách link check của chính mình, mở chi tiết, cập nhật
-metadata được cho phép và xóa link check. Mọi thao tác authentication và CRUD
-đều đi qua API; frontend không truy cập database. Mọi truy vấn link check và
-hidden link phải lọc theo authenticated `user_id`. Xóa link check phải xóa hoặc
-đánh dấu xóa hidden link/DOM liên quan theo retention policy.
+User có thể xem và xóa lịch sử URL của chính mình. Mọi thao tác authentication
+và history đều đi qua API; frontend không truy cập database. Mọi truy vấn URL
+history phải lọc theo authenticated `user_id`.
 
 ## 5. API contract
 
@@ -142,7 +143,6 @@ hidden link phải lọc theo authenticated `user_id`. Xóa link check phải x�
 | `GET` | `/v1/me` | Lấy user hiện tại |
 | `POST` | `/v1/link-checks` | Tạo link check |
 | `GET` | `/v1/link-checks/{check_id}` | Lấy kết quả link check |
-| `PATCH` | `/v1/link-checks/{check_id}` | Cập nhật metadata được phép |
 | `DELETE` | `/v1/link-checks/{check_id}` | Xóa link check |
 | `GET` | `/v1/me/link-checks` | Lấy lịch sử của user |
 
@@ -162,25 +162,24 @@ Response tạo scan tối thiểu:
 
 `id`, `google_subject`, `email`, `status`, `created_at`, `last_login_at`
 
-### LinkCheck
+### URL check history
 
-`id`, `user_id`, `submitted_url`, `normalized_url`, `final_url`, `status`, `http_status`, `error_code`, `dom_reference`, `notes`, `created_at`, `completed_at`, `retention_expires_at`
+`id`, `user_id`, `url`, `checked_at`
 
-### LinkResult
+### LinkResult (memory only)
 
 `id`, `link_check_id`, `element_type`, `object_reference`, `source_url`, `actual_url`, `visibility`, `visible_text`, `alt_text`, `position`
 
 ## 7. Non-functional requirements
 
 - **Security:** SSRF protection, sandbox worker, authentication và ownership checks.
-- **Privacy:** DOM và URL có retention; hạn chế log query string nhạy cảm.
+- **Privacy:** chỉ URL history có retention; DOM và hidden links không được lưu.
 - **Reliability:** timeout, 403, 429, SSL error và HTML lỗi phải trả trạng thái có kiểm soát.
 - **Performance:** static page nhỏ phải hoàn tất trong timeout cấu hình; dashboard không cần tải toàn bộ HTML.
 - **Maintainability:** ứng dụng tổ chức theo MVC dễ đọc và maintenance; extractor,
   persistence và API/UI contract phải tách biệt.
-- **Persistence:** PostgreSQL là database chính, dùng migration có version,
-  foreign key, transaction và index phù hợp cho ownership, lifecycle scan,
-  link result filters và ownership. SQLite chỉ dành cho test/prototype nếu cần.
+- **Persistence:** PostgreSQL lưu users, auth state và `url_checks` với migration,
+  foreign key và index ownership. SQLite chỉ dành cho test/prototype.
 
 ## 8. Known limitations
 

@@ -3,7 +3,7 @@
 ## 1. Phạm vi
 
 API MVP hỗ trợ Google OAuth, tạo một lần kiểm tra URL, lấy hidden link từ DOM
-của URL đầu vào, lưu kết quả theo user và tải lịch sử. API không
+của URL đầu vào trong phiên xử lý và tải lịch sử URL. API không
 fetch, mở hoặc điều hướng tới các link được phát hiện.
 
 ## 2. Endpoints
@@ -16,15 +16,11 @@ fetch, mở hoặc điều hướng tới các link được phát hiện.
 | `GET` | `/v1/me` | Lấy user hiện tại |
 | `POST` | `/v1/link-checks` | Tạo link check bất đồng bộ |
 | `GET` | `/v1/link-checks/{check_id}` | Lấy kết quả link check |
-| `PATCH` | `/v1/link-checks/{check_id}` | Cập nhật metadata được phép |
 | `DELETE` | `/v1/link-checks/{check_id}` | Xóa link check |
 | `GET` | `/v1/me/link-checks` | Lấy lịch sử của user |
 
 Mọi endpoint CRUD yêu cầu authenticated Google user. Frontend không truy cập
 trực tiếp database.
-
-`PATCH /v1/link-checks/{check_id}` chỉ nhận `{ "notes": "..." }`. Các URL,
-trạng thái xử lý và link results là immutable sau khi tạo hoặc worker xử lý.
 
 ## 3. Authentication
 
@@ -101,10 +97,7 @@ MVP không có trường đánh giá rủi ro hoặc risk verdict.
 - Server lấy `user_id` từ credential, không nhận `user_id` để gán ownership từ
   client.
 - Mọi query phải lọc theo authenticated `user_id` trước khi đọc/cập nhật/xóa.
-- `PATCH` chỉ cập nhật metadata được cho phép, không sửa `submitted_url`,
-  `normalized_url`, `final_url` hoặc link results.
-- `DELETE` xử lý `LinkCheck`, DOM reference và link results liên quan theo
-  retention policy.
+- `DELETE` chỉ xóa bản ghi URL history thuộc user.
 - API không tiết lộ việc một `check_id` của user khác có tồn tại hay không.
 
 ## 7. URL và dữ liệu nhạy cảm
@@ -117,13 +110,11 @@ MVP không có trường đánh giá rủi ro hoặc risk verdict.
 
 ## 8. PostgreSQL persistence
 
-PostgreSQL là database production chính với các bảng tối thiểu `users`,
-`link_checks` và `link_results`. Dùng foreign key, transaction và migration có
-version.
+PostgreSQL là database production chính với các bảng `users`, auth tables và
+`url_checks`. Hidden-link results chỉ tồn tại trong memory của process xử lý.
+Migration có version và foreign key bảo vệ ownership.
 
 Index tối thiểu:
 
 - unique `users.google_subject`;
-- `link_checks(user_id, created_at)`;
-- `link_results(link_check_id)`;
-- `link_results(visibility)` khi dashboard cần filter.
+- `url_checks(user_id, checked_at)`.

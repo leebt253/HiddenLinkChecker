@@ -73,3 +73,13 @@ def test_welcome_redirects_authenticated_user_to_dashboard_and_logout_revokes_se
     assert logout_response.status_code == 303
     assert api_client.logout_called
     assert "session=" in logout_response.headers["set-cookie"]
+
+
+def test_unknown_web_route_uses_custom_error_page() -> None:
+    client, _ = _client()
+
+    response = client.get("/does-not-exist")
+
+    assert response.status_code == 404
+    assert "Page not found" in response.text
+    assert "Return to dashboard" in response.text

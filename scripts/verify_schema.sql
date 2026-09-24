@@ -6,7 +6,7 @@ SELECT current_user, current_database();
 SELECT table_name
 FROM information_schema.tables
 WHERE table_schema = 'public'
-  AND table_name IN ('users', 'link_checks', 'link_results', 'user_sessions')
+  AND table_name IN ('users', 'url_checks', 'user_sessions', 'oauth_login_transactions')
 ORDER BY table_name;
 \echo 'ENUMS'
 SELECT t.typname, string_agg(e.enumlabel, ',' ORDER BY e.enumsortorder) AS labels
@@ -21,28 +21,27 @@ ORDER BY t.typname;
 SELECT table_name, column_name, data_type, udt_name, is_nullable
 FROM information_schema.columns
 WHERE table_schema = 'public'
-  AND table_name IN ('users', 'link_checks', 'link_results', 'user_sessions')
+  AND table_name IN ('users', 'url_checks', 'user_sessions', 'oauth_login_transactions')
 ORDER BY table_name, ordinal_position;
 \echo 'CONSTRAINTS'
 SELECT conrelid::regclass AS table_name, conname, contype,
        pg_get_constraintdef(oid) AS definition
 FROM pg_constraint
-WHERE conrelid::regclass::text IN ('users', 'link_checks', 'link_results', 'user_sessions')
+WHERE conrelid::regclass::text IN ('users', 'url_checks', 'user_sessions', 'oauth_login_transactions')
 ORDER BY table_name, conname;
 \echo 'INDEXES'
 SELECT tablename, indexname, indexdef
 FROM pg_indexes
 WHERE schemaname = 'public'
-  AND tablename IN ('users', 'link_checks', 'link_results', 'user_sessions')
+  AND tablename IN ('users', 'url_checks', 'user_sessions', 'oauth_login_transactions')
 ORDER BY tablename, indexname;
 \echo 'TRIGGERS'
 SELECT event_object_table, trigger_name, action_timing, event_manipulation
 FROM information_schema.triggers
 WHERE trigger_schema = 'public'
-  AND event_object_table IN ('users', 'link_checks', 'link_results', 'user_sessions')
+  AND event_object_table IN ('users', 'url_checks', 'user_sessions', 'oauth_login_transactions')
 ORDER BY event_object_table, trigger_name;
 \echo 'ROW COUNTS'
 SELECT 'users' AS table_name, count(*) AS row_count FROM users
-UNION ALL SELECT 'link_checks', count(*) FROM link_checks
-UNION ALL SELECT 'link_results', count(*) FROM link_results
+UNION ALL SELECT 'url_checks', count(*) FROM url_checks
 ORDER BY table_name;

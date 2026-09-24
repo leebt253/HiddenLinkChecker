@@ -14,7 +14,6 @@ from shared_contracts.api_models import (
     LinkCheckHistoryItem,
     LinkCheckResponse,
     LinkResultResponse,
-    UpdateLinkCheckRequest,
 )
 
 router = APIRouter(prefix="/v1", tags=["link-checks"])
@@ -139,17 +138,3 @@ def delete_link_check(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.patch("/link-checks/{check_id}", response_model=LinkCheckResponse)
-def update_link_check(
-    check_id: UUID,
-    payload: UpdateLinkCheckRequest,
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=20, le=100),
-    user: AuthenticatedUser = Depends(get_current_user),
-    service: LinkCheckService = Depends(get_link_check_service),
-) -> LinkCheckResponse:
-    """Update owner-editable metadata without changing scan inputs or results."""
-    link_check = service.update_notes(user, check_id, payload.notes)
-    if link_check is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Link check not found.")
-    return _to_response(link_check, page, page_size)

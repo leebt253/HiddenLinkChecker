@@ -119,6 +119,22 @@ def render_login(google_login_url: str) -> str:
     return _document("Sign in - Hidden Link Checker", body)
 
 
+
+
+def render_error(status_code: int, title: str, message: str) -> str:
+    """Render a safe, user-facing error page without exposing server internals."""
+    body = (
+        '<div class="site-shell"><header class="topbar">'
+        f'{_brand()}</header><main class="page-content"><section class="panel welcome-panel">'
+        f'<span class="eyebrow">Error {status_code}</span>'
+        f'<h1 class="inspection-title">{escape(title)}</h1>'
+        f'<p>{escape(message)}</p>'
+        '<a class="primary-button" href="/">Return to dashboard</a>'
+        '</section></main></div>'
+    )
+    return _document(f"Error {status_code} - Hidden Link Checker", body)
+
+
 def render_dashboard(history: list[LinkCheckHistoryItem], user: CurrentUserResponse) -> str:
     """Render URL submission and authenticated user's link-check history."""
     rows = "".join(

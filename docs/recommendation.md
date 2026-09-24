@@ -10,7 +10,9 @@ web. Sản phẩm nên tập trung vào việc giúp người dùng trả lời 
 2. URL thực tế được nhúng trong object đó là gì?
 3. Hidden link được lấy từ thuộc tính DOM nào?
 
-MVP chỉ tập trung vào việc lấy DOM, tìm hidden link và lưu kết quả theo user.
+MVP chỉ tập trung vào việc lấy DOM và tìm hidden link trong thời gian xử lý.
+Database chỉ lưu user và lịch sử URL đã check của user; không lưu DOM hoặc danh
+sách hidden link.
 Trong domain này, hidden link là mọi URL được phát hiện; link hiển thị trực tiếp
 chỉ là hidden link có `visibility = direct`, còn link không hiển thị trực tiếp có
 `visibility = indirect`.
@@ -21,14 +23,10 @@ không tự động mở, fetch, redirect hoặc kiểm tra các hidden link đ�
 Redirect của chính URL đầu vào chỉ được xử lý trong phạm vi cần thiết để lấy
 DOM và vẫn phải qua SSRF policy.
 
-Về nền tảng dữ liệu, khuyến nghị dùng **PostgreSQL làm database chính**. Domain
-`User -> LinkCheck -> HiddenLink` có quan hệ và ownership rõ ràng, cần transaction khi
-tạo/xóa dữ liệu liên quan, constraint để bảo vệ toàn vẹn và truy vấn đồng thời
-cho dashboard/lịch sử. PostgreSQL cũng phù hợp để lưu các phần có cấu trúc linh
-hoạt như `position`, evidence hoặc metadata dưới dạng JSONB trong khi vẫn giữ
-các field nghiệp vụ quan trọng ở cột có kiểu và index rõ ràng. SQLite chỉ nên
-dùng cho test hoặc prototype đơn tiến trình, không nên là database production
-cho web app nhiều worker.
+Về nền tảng dữ liệu, PostgreSQL chỉ giữ `users`, auth session/OAuth transaction
+và `url_checks(user_id, url, checked_at)`. Kết quả extractor là dữ liệu tạm
+thời trong worker/process, không được ghi vào database. SQLite chỉ nên dùng cho
+test hoặc prototype đơn tiến trình.
 
 ## 2. Customer problem
 
@@ -46,13 +44,13 @@ MVP nên cung cấp:
 
 - Phân tích URL từ text link, image và CSS background.
 - Dashboard nhập một URL và gọi API để lấy kết quả DOM/hidden link.
-- Lưu object chứa hidden link, visibility, loại element, URL nguồn và link thực tế
-	đã resolve.
+- Hiển thị object chứa hidden link, visibility, loại element, URL nguồn và link
+  thực tế trong phiên xử lý hiện tại.
 - Lịch sử các lần kiểm tra được phân quyền theo Google user.
 - CRUD dữ liệu kiểm tra được thực hiện qua API; frontend không truy cập database.
 - Chính sách bảo vệ SSRF và cô lập browser worker ngay từ phiên bản đầu.
-- PostgreSQL là persistence chính; migration, transaction, foreign key và
-	index phải được thiết kế cùng model User, LinkCheck và LinkResult.
+- PostgreSQL là persistence chính cho user và URL history; migration, foreign key
+  và index tập trung vào `users` và `url_checks`.
 
 ## 4. Customer-facing recommendation
 
@@ -82,7 +80,7 @@ Sau một lần kiểm tra thành công, khách hàng có thể:
 - Xem DOM hoặc dữ liệu DOM cần thiết cùng danh sách hidden link.
 - Biết hidden link nằm dưới object nào, URL nguồn, URL thực tế và visibility của nó.
 - Tải lại lịch sử các lần kiểm tra của chính mình.
-- Xóa hoặc cập nhật metadata của lần kiểm tra qua API theo quyền sở hữu.
+- Xóa URL history của chính mình qua API theo quyền sở hữu.
 
 Kết quả chỉ phản ánh DOM đã lấy từ URL đầu vào trong phạm vi giới hạn. Sản phẩm
 không được diễn đạt kết quả này như chứng nhận website an toàn.
@@ -94,8 +92,8 @@ MVP được xem là đạt khi:
 - Google user có thể đăng nhập và chỉ truy cập dữ liệu của chính mình.
 - API lấy được DOM của URL đầu vào và nhận diện hidden link trong text/image/background.
 - Hidden link không gây ra request hoặc navigation tự động tới link đó.
-- Kết quả lưu được user, URL kiểm tra, object chứa hidden link và link thực tế.
-- API hỗ trợ create/read/update/delete theo ownership và dashboard tải được history.
+- Lịch sử lưu được user, URL kiểm tra và thời điểm kiểm tra.
+- API hỗ trợ create/read/delete URL history theo ownership và dashboard tải được history.
 - URL đầu vào, redirect của URL đầu vào và endpoint metadata được kiểm tra SSRF.
 
 ## 7. Product decisions requested
@@ -103,9 +101,7 @@ MVP được xem là đạt khi:
 Các quyết định nên được chốt trước khi triển khai đầy đủ:
 
 - Thời gian chờ, kích thước response và giới hạn tài nguyên của worker.
-- Schema lưu DOM: raw DOM, sanitized DOM hay chỉ phần DOM cần thiết.
-- Các field được phép cập nhật qua `PATCH` và các field kết quả immutable.
-- Thời gian retention của DOM, URL và hidden link.
+- Chính sách kết quả tạm thời trong memory và thời gian giữ URL history.
 - Google OAuth callback, session/token, logout và account linking.
 - PostgreSQL deployment, migration strategy, backup/restore và retention purge.
 - Cách hiển thị URL có query string nhạy cảm.
@@ -114,9 +110,8 @@ Các quyết định nên được chốt trước khi triển khai đầy đủ
 
 ## 8. Recommendation conclusion
 
-Nên triển khai theo từng lát dọc: Google OAuth, API tạo một `LinkCheck`, fetch
-URL đầu vào an toàn, parse DOM mà không mở hidden link, lưu kết quả theo user,
-API history/CRUD và dashboard. PostgreSQL phù hợp vì cần liên kết user, lần
-kiểm tra và nhiều hidden link trong transaction, cùng ownership query và
-cascade deletion rõ ràng. Mỗi lát cần test bảo mật, test non-navigation, test
-API ownership và test migration.
+Nên triển khai theo từng lát dọc: Google OAuth, API tạo một lần check, fetch URL
+đầu vào an toàn, parse DOM không mở hidden link, hiển thị kết quả tạm thời và
+lưu tối thiểu URL/date cho history. PostgreSQL chỉ cần ownership query và
+cascade deletion giữa user và URL history. Mỗi lát cần test bảo mật,
+non-navigation, ownership và migration.
