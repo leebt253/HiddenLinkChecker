@@ -16,10 +16,37 @@ def calculate_tax(
     return calculate(data, metadata)
 
 
-def calculate_tax_file(path: str | Path) -> CalculationResult:
-    """Load a JSON calculation input and calculate its line and order totals."""
-    input_data = _load_input(path)
-    return calculate_tax(input_data["data"], input_data["metadata"])
+def calculate_tax_file(
+    input_path: str | Path, output_path: str | Path | None = None
+) -> CalculationResult:
+    """Calculate a JSON input and optionally write the result as JSON."""
+    input_data = _load_input(input_path)
+    result = calculate_tax(input_data["data"], input_data["metadata"])
+    if output_path is not None:
+        _write_output(result, input_data["metadata"], output_path)
+    return result
+
+
+def _write_output(
+    result: CalculationResult, metadata: Mapping[str, Any], output_path: str | Path
+) -> None:
+    item_field = metadata["column_mapping"]["item_name"]
+    output = {
+        "items": [
+            {
+                "item_name": item.original_data[item_field],
+                "before_tax": str(item.before_tax),
+                "vat": str(item.vat),
+                "after_tax": str(item.after_tax),
+            }
+            for item in result.items
+        ],
+        "total_before_tax": str(result.total_before_tax),
+        "total_after_tax": str(result.total_after_tax),
+    }
+    target = Path(output_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(output, indent=2) + "\n", encoding="utf-8")
 
 
 def _load_input(path: str | Path) -> dict[str, Any]:

@@ -10,6 +10,7 @@ trực tiếp chỉ là một dạng hidden link có `visibility = direct`.
 - [Tính năng](#tính-năng)
 - [Kiến trúc và công nghệ](#kiến-trúc-và-công-nghệ)
 - [Cài đặt](#cài-đặt)
+- [Tax Calculation](#tax-calculation)
 - [Sử dụng](#sử-dụng)
 - [Bảo mật](#bảo-mật)
 - [Cấu trúc repository](#cấu-trúc-repository)
@@ -98,7 +99,7 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-### Tích hợp TaxCalculationLibrary
+## Tax Calculation
 
 Build và cài thư viện tính thuế sibling project trước khi chạy module tích hợp:
 
@@ -108,10 +109,72 @@ python -m pip install -e ".[test]"
 Pop-Location
 ```
 
+### Chạy test thư viện
+
+Từ thư mục `HiddenLinkChecker`, chạy test của thư viện dùng chung:
+
+```powershell
+Push-Location ..\TaxCalculationLibrary
+..\HiddenLinkChecker\.venv\Scripts\python.exe -m pytest -q
+Pop-Location
+```
+
+Kết quả mong đợi hiện tại là `10 passed`.
+
+Chạy test adapter JSON trong HiddenLinkChecker:
+
+```powershell
+.venv\Scripts\python.exe -m pytest -q tests\unit\api\test_tax_calculation.py
+```
+
+Chạy toàn bộ test của HiddenLinkChecker:
+
+```powershell
+.venv\Scripts\python.exe -m pytest -q
+```
+
+### Input và output mẫu
+
 Module `hidden_link_checker_api.services.tax_calculation` cung cấp
-`calculate_tax(data, metadata)` và `calculate_tax_file(path)`. Mười input JSON mẫu
-với tối thiểu 10 dòng mỗi file nằm trong `examples/tax_inputs/`; output tương ứng
-nằm trong `examples/tax_outputs/`.
+`calculate_tax(data, metadata)` và `calculate_tax_file(input_path, output_path)`. Mười input JSON mẫu
+với tối thiểu 10 dòng mỗi file nằm trong [examples/tax_inputs](examples/tax_inputs/).
+Output mẫu tương ứng nằm trong [examples/tax_outputs](examples/tax_outputs/).
+
+Chạy một input JSON thực tế từ PowerShell:
+
+```powershell
+.venv\Scripts\python.exe scripts\run_tax_calculation.py `
+	examples\tax_inputs\retail_order.json `
+	examples\tax_outputs\retail_order.result.json
+```
+
+Kết quả được ghi vào file output JSON chỉ định. Có thể gọi trực tiếp trong Python:
+
+```python
+from hidden_link_checker_api.services.tax_calculation import calculate_tax_file
+
+calculate_tax_file("input.json", "output.json")
+```
+
+Có thể chạy bằng CMD bằng file [scripts/run_tax_calculation.cmd](scripts/run_tax_calculation.cmd):
+
+```cmd
+scripts\run_tax_calculation.cmd
+```
+
+Khi được hỏi, nhập đường dẫn file input JSON, ví dụ:
+
+```text
+examples\tax_inputs\hotel_booking.json
+```
+
+Output sẽ tự động được tạo cùng thư mục với tên:
+
+```text
+hotel_booking.result.json
+```
+
+Output được tạo cùng thư mục với input và có hậu tố `.result.json`.
 
 Google OAuth credentials và cấu hình PostgreSQL sẽ được cung cấp qua biến môi
 trường khi web application được triển khai. Sao chép `.env.example` thành

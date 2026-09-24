@@ -8,7 +8,9 @@ from hidden_link_checker_api.services.tax_calculation import calculate_tax_file
 
 
 SAMPLE_INPUTS = sorted(
-    Path(__file__).parents[3].joinpath("examples", "tax_inputs").glob("*.json")
+    path
+    for path in Path(__file__).parents[3].joinpath("examples", "tax_inputs").glob("*.json")
+    if not path.name.endswith(".result.json")
 )
 
 
@@ -17,6 +19,8 @@ def test_sample_tax_inputs_are_calculated(input_path: Path):
     payload = json.loads(input_path.read_text(encoding="utf-8"))
     result = calculate_tax_file(input_path)
     output_path = input_path.parents[1].joinpath("tax_outputs", input_path.name)
+    if not output_path.exists():
+        output_path = input_path.with_name(f"{input_path.stem}.result.json")
     expected = json.loads(output_path.read_text(encoding="utf-8"))
     item_field = payload["metadata"]["column_mapping"]["item_name"]
 
@@ -32,3 +36,17 @@ def test_sample_tax_inputs_are_calculated(input_path: Path):
     assert result.total_after_tax >= result.total_before_tax
     assert str(result.total_before_tax) == expected["total_before_tax"]
     assert str(result.total_after_tax) == expected["total_after_tax"]
+
+
+def test_calculate_tax_file_writes_json_output(tmp_path: Path):
+    input_path = SAMPLE_INPUTS[0]
+    output_path = tmp_path / "nested" / "calculation.json"
+
+    calculate_tax_file(input_path, output_path)
+
+    expected_path = input_path.parents[1].joinpath("tax_outputs", input_path.name)
+    if not expected_path.exists():
+        expected_path = input_path.with_name(f"{input_path.stem}.result.json")
+    assert json.loads(output_path.read_text(encoding="utf-8")) == json.loads(
+        expected_path.read_text(encoding="utf-8")
+    )
