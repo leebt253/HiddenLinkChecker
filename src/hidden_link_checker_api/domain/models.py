@@ -136,8 +136,11 @@ class LinkCheck:
     id: UUID = field(default_factory=uuid4)
     status: LinkCheckStatus = LinkCheckStatus.QUEUED
     final_url: str | None = None
+    http_status: int | None = None
+    error_code: str | None = None
     dom_reference: str | None = None
     limitations: list[str] = field(default_factory=list)
+    notes: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
     links: list[LinkResult] = field(default_factory=list)

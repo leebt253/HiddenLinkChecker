@@ -153,16 +153,19 @@ def render_link_check(link_check: LinkCheckResponse) -> str:
         "<tr>"
         f"<td>{escape(link.element_type)}</td>"
         f"<td>{escape(link.visibility)}</td>"
+        f"<td>{escape(link.object_reference or '')}</td>"
         f"<td>{escape(link.source_url)}</td>"
         f"<td>{escape(link.actual_url)}</td>"
+        f"<td>{escape(link.visible_text or '')}</td>"
+        f"<td>{escape(link.alt_text or '')}</td>"
         "</tr>"
         for link in link_check.links
     )
     is_processing = link_check.status in {"queued", "running"}
     refresh_head = '<meta http-equiv="refresh" content="2">' if is_processing else ""
     links_summary = (
-        f'<p class="muted">{len(link_check.links)} hidden link(s) found.</p>'
-        if link_check.links
+        f'<p class="muted">{link_check.total_links} hidden link(s) found.</p>'
+        if link_check.total_links
         else '<p class="muted">No hidden links found in the readable page content.</p>'
     )
     limitations = "".join(f"<li>{escape(item)}</li>" for item in link_check.limitations)
@@ -172,7 +175,7 @@ def render_link_check(link_check: LinkCheckResponse) -> str:
         else ""
     )
     results_table = (
-        '<div class="results-scroll"><table class="result-table"><thead><tr><th>Type</th><th>Visibility</th><th>Source</th><th>Actual URL</th></tr></thead>'
+        '<div class="results-scroll"><table class="result-table"><thead><tr><th>Type</th><th>Visibility</th><th>Object</th><th>Source</th><th>Actual URL</th><th>Visible text</th><th>Alt text</th></tr></thead>'
         f'<tbody>{rows}</tbody></table></div>'
         if rows
         else ""
@@ -205,6 +208,7 @@ def render_link_check(link_check: LinkCheckResponse) -> str:
         f'<span class="eyebrow">Inspection / {escape(link_check.status)}</span>'
         f'<h1 class="inspection-title">Inspection result</h1>'
         f'<label class="inspection-url">Submitted URL<input type="text" value="{escape(link_check.submitted_url, quote=True)}" readonly></label>'
+        f'<p class="muted">DOM reference: {escape(link_check.dom_reference or "Not retained")}</p>'
         f'{links_summary}{limitations_block}{results_table}{pagination}<a class="back-link" href="/">Back to dashboard</a>'
         '</section></main></div>'
     )

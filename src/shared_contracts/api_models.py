@@ -26,6 +26,12 @@ class CreateLinkCheckResponse(BaseModel):
     created_at: datetime
 
 
+class UpdateLinkCheckRequest(BaseModel):
+    """Metadata that an owner may change without altering scan results."""
+
+    notes: str | None = Field(default=None, max_length=2000)
+
+
 class LinkResultResponse(BaseModel):
     """A hidden link extracted from a completed DOM."""
 
@@ -48,7 +54,10 @@ class LinkCheckResponse(BaseModel):
     submitted_url: str
     normalized_url: str | None
     final_url: str | None
+    http_status: int | None
+    error_code: str | None
     dom_reference: str | None
+    notes: str | None
     limitations: list[str]
     created_at: datetime
     completed_at: datetime | None

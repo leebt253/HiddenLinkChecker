@@ -22,3 +22,7 @@ class ApiSettings(BaseSettings):
     session_cookie_name: str = "hidden_link_checker_session"
     session_lifetime_days: int = 7
     session_cookie_secure: bool = False
+    scan_timeout_seconds: float = 10.0
+    scan_max_redirects: int = 5
+    scan_max_response_bytes: int = 2 * 1024 * 1024
+    scan_max_concurrent: int = 4

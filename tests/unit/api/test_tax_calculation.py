@@ -6,7 +6,6 @@ import pytest
 
 from hidden_link_checker_api.services.tax_calculation import calculate_tax_file
 
-
 SAMPLE_INPUTS = sorted(
     path
     for path in Path(__file__).parents[3].joinpath("examples", "tax_inputs").glob("*.json")
@@ -32,7 +31,7 @@ def test_sample_tax_inputs_are_calculated(input_path: Path):
         assert str(item.vat) == expected_item["vat"]
         assert str(item.after_tax) == expected_item["after_tax"]
 
-    assert result.total_before_tax > Decimal("0")
+    assert result.total_before_tax > Decimal(0)
     assert result.total_after_tax >= result.total_before_tax
     assert str(result.total_before_tax) == expected["total_before_tax"]
     assert str(result.total_after_tax) == expected["total_after_tax"]

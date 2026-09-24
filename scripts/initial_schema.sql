@@ -46,6 +46,7 @@ CREATE TABLE link_checks (
     user_id UUID NOT NULL,
     submitted_url TEXT NOT NULL,
     normalized_url TEXT,
+    include_dom BOOLEAN NOT NULL DEFAULT TRUE,
     final_url TEXT,
     status link_check_status NOT NULL DEFAULT 'queued',
     http_status INTEGER,

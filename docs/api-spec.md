@@ -23,6 +23,9 @@ fetch, mở hoặc điều hướng tới các link được phát hiện.
 Mọi endpoint CRUD yêu cầu authenticated Google user. Frontend không truy cập
 trực tiếp database.
 
+`PATCH /v1/link-checks/{check_id}` chỉ nhận `{ "notes": "..." }`. Các URL,
+trạng thái xử lý và link results là immutable sau khi tạo hoặc worker xử lý.
+
 ## 3. Authentication
 
 Google OAuth/OIDC là cơ chế đăng nhập duy nhất của MVP. Backend phải kiểm tra

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from shared_calculation import CalculationResult, calculate
 
@@ -54,9 +55,9 @@ def _load_input(path: str | Path) -> dict[str, Any]:
         input_data = json.load(handle)
 
     if not isinstance(input_data, dict):
-        raise ValueError("tax calculation input must be a JSON object")
+        raise TypeError("tax calculation input must be a JSON object")
     if not isinstance(input_data.get("data"), list):
-        raise ValueError("tax calculation input must contain a data list")
+        raise TypeError("tax calculation input must contain a data list")
     if not isinstance(input_data.get("metadata"), dict):
-        raise ValueError("tax calculation input must contain a metadata object")
+        raise TypeError("tax calculation input must contain a metadata object")
     return input_data

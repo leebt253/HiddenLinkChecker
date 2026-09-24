@@ -38,3 +38,7 @@ class LinkCheckService:
     def delete(self, user: AuthenticatedUser, check_id: UUID) -> bool:
         """Delete a check only if it belongs to the authenticated user."""
         return self._repository.delete_owned(user.id, check_id)
+
+    def update_notes(self, user: AuthenticatedUser, check_id: UUID, notes: str | None) -> LinkCheck | None:
+        """Update only owner-editable metadata for a link check."""
+        return self._repository.update_notes(user.id, check_id, notes)

@@ -12,7 +12,11 @@ from hidden_link_checker_api.repositories.auth import (
     InMemoryAuthRepository,
     PostgreSQLAuthRepository,
 )
-from hidden_link_checker_api.repositories.link_checks import InMemoryLinkCheckRepository
+from hidden_link_checker_api.repositories.link_checks import (
+    InMemoryLinkCheckRepository,
+    LinkCheckRepository,
+    PostgreSQLLinkCheckRepository,
+)
 from hidden_link_checker_api.services.auth import (
     AuthenticationService,
     GoogleIdTokenVerifier,
@@ -29,11 +33,22 @@ def create_app(settings: ApiSettings | None = None, auth_repository: AuthReposit
     app = FastAPI(title="Hidden Link Checker API", version="0.1.0")
     app.state.settings = resolved_settings
     app.state.authentication_service = _build_authentication_service(resolved_settings, auth_repository)
-    link_check_repository = InMemoryLinkCheckRepository()
-    link_check_worker = LinkCheckWorker(link_check_repository)
+    link_check_repository: LinkCheckRepository = (
+        PostgreSQLLinkCheckRepository(resolved_settings.database_url)
+        if resolved_settings.database_url
+        else InMemoryLinkCheckRepository()
+    )
+    link_check_worker = LinkCheckWorker(
+        link_check_repository,
+        timeout_seconds=resolved_settings.scan_timeout_seconds,
+        max_redirects=resolved_settings.scan_max_redirects,
+        max_response_bytes=resolved_settings.scan_max_response_bytes,
+    )
     app.state.link_check_service = LinkCheckService(
         repository=link_check_repository,
-        queue=InMemoryLinkCheckQueue(link_check_worker.process),
+        queue=InMemoryLinkCheckQueue(
+            link_check_worker.process, max_concurrent=resolved_settings.scan_max_concurrent
+        ),
     )
     app.include_router(auth_router)
     app.include_router(link_checks_router)

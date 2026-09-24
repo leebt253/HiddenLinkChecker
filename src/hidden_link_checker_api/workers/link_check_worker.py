@@ -47,18 +47,24 @@ class LinkCheckWorker:
             return
         link_check.status = LinkCheckStatus.RUNNING
         try:
-            html, final_url, limitations = self._fetch_document(link_check.normalized_url)
+            html, final_url, http_status, limitations = self._fetch_document(link_check.normalized_url)
             link_check.final_url = final_url
+            link_check.http_status = http_status
             link_check.links = extract_findings(html, final_url, link_check.id)
+            link_check.dom_reference = f"inline:{link_check.id}" if link_check.include_dom else None
             link_check.limitations.extend(limitations)
             link_check.status = LinkCheckStatus.PARTIAL if limitations else LinkCheckStatus.COMPLETED
         except (InvalidInputUrlError, UnsafeNavigationUrlError, httpx.HTTPError, LinkCheckFetchError) as error:
             link_check.limitations.append(str(error))
+            link_check.error_code = _error_code(error)
             link_check.status = LinkCheckStatus.FAILED
         finally:
             link_check.completed_at = datetime.now(UTC)
+            save_processed = getattr(self._repository, "save_processed", None)
+            if save_processed is not None:
+                save_processed(link_check)
 
-    def _fetch_document(self, submitted_url: str) -> tuple[str, str, list[str]]:
+    def _fetch_document(self, submitted_url: str) -> tuple[str, str, int, list[str]]:
         current_url = ensure_safe_navigation_url(submitted_url)
         limitations: list[str] = []
         with httpx.Client(
@@ -88,7 +94,12 @@ class LinkCheckWorker:
                     content_type = response.headers.get("content-type", "")
                     if content_type and "html" not in content_type.lower():
                         limitations.append("The response content type is not HTML.")
-                    return content.decode(response.encoding or "utf-8", errors="replace"), current_url, limitations
+                    return (
+                        content.decode(response.encoding or "utf-8", errors="replace"),
+                        current_url,
+                        response.status_code,
+                        limitations,
+                    )
         raise LinkCheckFetchError("The input URL could not be fetched.")
 
     def _read_limited_body(self, response: httpx.Response) -> bytes:
@@ -100,3 +111,15 @@ class LinkCheckWorker:
                 raise LinkCheckFetchError("The response exceeded the configured size limit.")
             chunks.append(chunk)
         return b"".join(chunks)
+
+
+def _error_code(error: Exception) -> str:
+    if isinstance(error, UnsafeNavigationUrlError):
+        return "unsafe_navigation_url"
+    if isinstance(error, InvalidInputUrlError):
+        return "invalid_input_url"
+    if isinstance(error, httpx.TimeoutException):
+        return "timeout"
+    if isinstance(error, httpx.HTTPStatusError):
+        return f"http_{error.response.status_code}"
+    return "fetch_failed"

@@ -31,6 +31,16 @@ class HiddenLinkExtractor(HTMLParser):
             self._anchor_text = []
         if tag == "img":
             self._add_image_links(attributes, object_reference)
+            if self._anchor_href:
+                self._links.append(
+                    self._new_result(
+                        element_type=ElementType.IMAGE,
+                        object_reference=object_reference,
+                        source_url=self._anchor_href,
+                        visibility=Visibility.INDIRECT,
+                        alt_text=attributes.get("alt"),
+                    )
+                )
         self._add_background_links(attributes.get("style"), object_reference)
 
     def handle_data(self, data: str) -> None:
