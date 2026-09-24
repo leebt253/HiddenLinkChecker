@@ -20,12 +20,20 @@ def _api_client(request: Request) -> HiddenLinkCheckerApiClient:
 async def dashboard(request: Request) -> HTMLResponse:
     """Show the URL form and authenticated user's link-check history."""
     try:
-        history = await _api_client(request).list_link_checks(request.cookies)
+        client = _api_client(request)
+        user = await client.get_current_user(request.cookies)
+        history = await client.list_link_checks(request.cookies)
     except httpx.HTTPStatusError as error:
         if error.response.status_code == status.HTTP_401_UNAUTHORIZED:
-            return HTMLResponse("Authentication required.", status_code=status.HTTP_401_UNAUTHORIZED)
+            return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="API unavailable.") from error
-    return HTMLResponse(render_dashboard(history))
+    return HTMLResponse(render_dashboard(history, user))
+
+
+@router.get("/link-checks", response_class=HTMLResponse)
+async def link_checks_page(request: Request) -> HTMLResponse:
+    """Expose the dashboard at the link-checks collection URL as well."""
+    return await dashboard(request)
 
 
 @router.post("/link-checks")

@@ -32,13 +32,13 @@ def start_google_login(request: Request) -> RedirectResponse:
 
 @router.get("/auth/google/callback")
 async def complete_google_login(code: str, state: str, request: Request) -> RedirectResponse:
-    """Verify Google identity, establish an opaque session and open the welcome page."""
+    """Verify Google identity, establish an opaque session and open the dashboard."""
     try:
         _, session_token = await _authentication_service(request).complete_google_login(code, state)
     except InvalidOAuthCallbackError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
     settings = _settings(request)
-    response = RedirectResponse(url=f"{settings.web_base_url.rstrip('/')}/welcome", status_code=303)
+    response = RedirectResponse(url=f"{settings.web_base_url.rstrip('/')}/", status_code=303)
     response.set_cookie(
         key=settings.session_cookie_name,
         value=session_token,

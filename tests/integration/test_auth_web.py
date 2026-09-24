@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from hidden_link_checker_web.config import WebSettings
 from hidden_link_checker_web.main import create_app
-from shared_contracts.api_models import CurrentUserResponse
+from shared_contracts.api_models import CurrentUserResponse, LinkCheckHistoryItem
 
 
 class FakeApiClient:
@@ -27,6 +27,9 @@ class FakeApiClient:
     async def logout(self, cookies: object) -> None:
         self.logout_called = True
         self.authenticated = False
+
+    async def list_link_checks(self, cookies: object) -> list[LinkCheckHistoryItem]:
+        return []
 
     def google_login_url(self) -> str:
         return "http://api.test/v1/auth/google/start"
@@ -58,14 +61,15 @@ def test_welcome_redirects_unauthenticated_user_to_login() -> None:
     assert response.headers["location"] == "/login"
 
 
-def test_welcome_displays_api_profile_name_and_logout_revokes_session() -> None:
+def test_welcome_redirects_authenticated_user_to_dashboard_and_logout_revokes_session() -> None:
     client, api_client = _client()
     api_client.authenticated = True
 
-    welcome_response = client.get("/welcome")
+    welcome_response = client.get("/welcome", follow_redirects=False)
     logout_response = client.post("/logout", follow_redirects=False)
 
-    assert "Nguyen Van A" in welcome_response.text
+    assert welcome_response.status_code == 303
+    assert welcome_response.headers["location"] == "/"
     assert logout_response.status_code == 303
     assert api_client.logout_called
     assert "session=" in logout_response.headers["set-cookie"]
