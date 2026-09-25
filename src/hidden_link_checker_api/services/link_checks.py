@@ -30,7 +30,19 @@ class LinkCheckService:
         self._processor = processor
 
     def check(self, user: AuthenticatedUser, submitted_url: str) -> LinkCheck:
-        """Inspect a URL synchronously and store only its submitted URL and timestamp."""
+        """Inspect a URL synchronously and store only its URL history entry.
+
+        Args:
+            user: Authenticated owner of the scan.
+            submitted_url: URL supplied by the user.
+
+        Returns:
+            Scan status and findings for this response. Findings are not persisted.
+
+        Notes:
+            Stores the submitted URL and check timestamp in the user's history,
+            including when URL validation fails.
+        """
         now = datetime.now(UTC)
         try:
             normalized_url = normalize_input_url(submitted_url)
@@ -63,7 +75,9 @@ class LinkCheckService:
         return link_check
 
     def list_history(self, user: AuthenticatedUser) -> list[UrlCheckHistory]:
+        """Return URL history entries owned by the authenticated user."""
         return self._repository.list_owned(user.id)
 
     def delete_history(self, user: AuthenticatedUser, check_id: UUID) -> bool:
+        """Delete a history entry only when it belongs to the authenticated user."""
         return self._repository.delete_owned(user.id, check_id)

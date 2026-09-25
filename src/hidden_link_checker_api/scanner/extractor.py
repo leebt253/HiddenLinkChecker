@@ -128,7 +128,15 @@ class HiddenLinkExtractor(HTMLParser):
 
 
 def extract_findings(html: str, final_url: str) -> list[LinkResult]:
-    """Extract supported DOM URLs as data only; this function performs no I/O."""
+    """Extract supported DOM URLs as data without requesting their destinations.
+
+    Args:
+        html: HTML document whose supported references should be inspected.
+        final_url: Final page URL used to resolve relative references.
+
+    Returns:
+        Link results in DOM order, including source and resolved URLs.
+    """
     extractor = HiddenLinkExtractor(final_url=final_url)
     extractor.feed(html)
     extractor.close()

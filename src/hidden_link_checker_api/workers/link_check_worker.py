@@ -57,7 +57,14 @@ class LinkCheckWorker:
         )
 
     def process(self, link_check: LinkCheck) -> None:
-        """Fetch only the submitted page and attach findings to this request object."""
+        """Fetch and inspect only the submitted page, updating the scan result in place.
+
+        Findings remain on the request result and are not persisted by this worker.
+        Resource, network, and unexpected failures become controlled failed results.
+
+        Args:
+            link_check: Scan result populated by this worker.
+        """
         deadline = monotonic() + self._timeout
         if not self._slots.acquire(timeout=self._timeout):
             link_check.limitations.append(

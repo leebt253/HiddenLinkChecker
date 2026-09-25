@@ -61,9 +61,18 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
 
 - Code phải tự giải thích bằng tên và cấu trúc; chỉ comment lý do nghiệp vụ,
   giới hạn kỹ thuật hoặc quyết định an toàn không hiển nhiên.
-- Dùng docstring theo phong cách Python cho module, class và public function
-  có contract hoặc hành vi không tầm thường; không dùng JSDoc hay JavaDoc.
-- Docstring cần nêu input, output, exception và side effect quan trọng.
+- Dùng Google-style docstring cho module, class và public function/method có
+  contract hoặc hành vi không tầm thường. Đây là quy ước Python tương tự cách
+  JavaDoc tổ chức tài liệu; không dùng cú pháp JSDoc/JavaDoc.
+- Dùng type hints để ghi kiểu dữ liệu; docstring tập trung giải thích ý nghĩa,
+  điều kiện và hành vi, tránh lặp lại kiểu đã có trong chữ ký hàm.
+- Với hàm cần mô tả chi tiết, dùng các mục `Args`, `Returns`, `Raises` và
+  `Yields` theo Google style. Ghi rõ side effect quan trọng trong phần mô tả
+  hoặc mục riêng phù hợp. Bỏ các mục không cần thiết với hàm đơn giản.
+- Module docstring nêu trách nhiệm module; class docstring nêu vai trò và
+  contract. Chỉ viết docstring cho private function khi mục đích, giới hạn kỹ
+  thuật hoặc quy tắc an toàn chưa rõ từ tên và cấu trúc code.
+- Không viết comment/docstring để diễn giải lại từng dòng code hiển nhiên.
 - Cập nhật documentation khi thay đổi contract của link result, vòng đời request
   kiểm tra URL hoặc giới hạn bảo mật.
 

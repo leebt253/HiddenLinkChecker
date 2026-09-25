@@ -34,7 +34,20 @@ class SafeNavigationURL(str):
 
 
 def ensure_safe_navigation_url(candidate_url: str) -> SafeNavigationURL:
-    """Validate a URL and retain its verified addresses for a pinned connection."""
+    """Validate a navigation URL and retain verified addresses for connection pinning.
+
+    Args:
+        candidate_url: Absolute HTTP(S) URL to validate.
+
+    Returns:
+        Normalized URL carrying its hostname and globally routable DNS answers.
+
+    Raises:
+        InvalidInputUrlError: The URL is malformed or uses an unsupported scheme.
+        NavigationDnsError: The hostname cannot be resolved to usable addresses.
+        UnsafeNavigationUrlError: The host is a metadata endpoint or resolves to a
+            prohibited address.
+    """
     normalized_url = normalize_input_url(candidate_url)
     hostname = urlsplit(normalized_url).hostname
     if hostname is None:
