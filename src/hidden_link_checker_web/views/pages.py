@@ -78,6 +78,8 @@ a { color: inherit; }
 .results-scroll .result-table { margin-top: 0; min-width: 760px; }
 .result-table th, .result-table td { padding: 12px 10px; border-bottom: 1px solid var(--line); text-align: left; }
 .result-table th { color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.dom-context { margin-top: 20px; font: 14px Arial, sans-serif; }
+.dom-context pre { max-height: 360px; overflow: auto; padding: 14px; background: #eef1ed; white-space: pre-wrap; overflow-wrap: anywhere; }
 .pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; font: 13px Arial, sans-serif; }
 .pagination a, .pagination select { padding: 8px 10px; border: 1px solid var(--line); color: var(--teal-dark); background: var(--white); text-decoration: none; }
 .pagination select { cursor: pointer; }
@@ -135,13 +137,43 @@ def render_error(status_code: int, title: str, message: str) -> str:
     return _document(f"Error {status_code} - Hidden Link Checker", body)
 
 
-def render_dashboard(history: list[LinkCheckHistoryItem], user: CurrentUserResponse) -> str:
+def render_dashboard(
+    history: list[LinkCheckHistoryItem], user: CurrentUserResponse, recent_page: int = 1
+) -> str:
     """Render URL submission and authenticated user's link-check history."""
+    unique_by_url: dict[str, LinkCheckHistoryItem] = {}
+    for item in history:
+        unique_by_url.setdefault(item.url, item)
+    unique_history = list(unique_by_url.values())
+    page_size = 10
+    page_count = max(1, (len(unique_history) + page_size - 1) // page_size)
+    current_page = min(max(recent_page, 1), page_count)
+    page_start = (current_page - 1) * page_size
+    visible_history = unique_history[page_start : page_start + page_size]
     rows = "".join(
-        f'<li class="history-item"><div class="history-item-main"><input class="history-url" type="text" value="{escape(item.submitted_url, quote=True)}" readonly aria-label="Submitted URL"><a href="/link-checks/{item.check_id}">Open inspection</a></div><span class="status">{escape(item.status)}</span></li>'
-        for item in history
+        f'<li class="history-item"><div class="history-item-main"><input class="history-url" type="text" value="{escape(item.url, quote=True)}" readonly aria-label="Checked URL"><span class="muted">{escape(item.checked_at.isoformat())}</span></div><form action="/link-checks/{item.check_id}/delete" method="post"><button class="logout-button" type="submit">Delete history</button></form></li>'
+        for item in visible_history
     )
-    history_html = f'<ul class="history-list">{rows}</ul>' if rows else '<div class="empty">No checks yet. Your first inspection will appear here.</div>'
+    if rows:
+        page_links = []
+        if current_page > 1:
+            page_links.append(f'<a href="/?recent_page={current_page - 1}" rel="prev">Previous</a>')
+        page_links.extend(
+            f'<a href="/?recent_page={page}" aria-current="page">{page}</a>'
+            if page == current_page
+            else f'<a href="/?recent_page={page}">{page}</a>'
+            for page in range(1, page_count + 1)
+        )
+        if current_page < page_count:
+            page_links.append(f'<a href="/?recent_page={current_page + 1}" rel="next">Next</a>')
+        history_html = (
+            f'<ul class="history-list">{rows}</ul>'
+            f'<nav class="pagination" aria-label="Recent checks pages">'
+            f'<span>Page {current_page} of {page_count} · {len(unique_history)} URLs</span>'
+            f'{"".join(page_links)}</nav>'
+        )
+    else:
+        history_html = '<div class="empty">No checks yet. Your first inspection will appear here.</div>'
     body = (
         '<div class="site-shell"><header class="topbar">'
         f'{_brand()}{_profile(user)}'
@@ -150,13 +182,12 @@ def render_dashboard(history: list[LinkCheckHistoryItem], user: CurrentUserRespo
         '<p>Track the hidden destinations inside your pages before they become a blind spot.</p>'
         '</section><section class="workspace"><div class="panel">'
         '<span class="eyebrow">New inspection</span><h2>Check a URL</h2>'
-        '<p>We will inspect the submitted page only. Discovered links are recorded, not opened.</p>'
+        '<p>We inspect only the submitted page. Findings appear in this response and are not saved.</p>'
         '<form class="url-form" action="/link-checks" method="post">'
         '<label for="url">Page address<input id="url" name="url" type="url" placeholder="https://example.com/page" required></label>'
-        '<label class="check-option"><input name="include_dom" type="checkbox" checked> Include DOM context</label>'
-        '<button class="primary-button" type="submit">Start inspection</button></form></div>'
+        '<button class="primary-button" type="submit">Check URL</button></form></div>'
         '<aside class="panel"><span class="eyebrow">Workspace pulse</span><div class="stats">'
-        f'<div class="stat"><span class="muted">Checks</span><strong>{len(history)}</strong></div>'
+        f'<div class="stat"><span class="muted">Unique URLs checked</span><strong>{len(unique_history)}</strong></div>'
         '</div>'
         f'<div class="history"><h2>Recent checks</h2>{history_html}</div></aside></section></main></div>'
     )
@@ -164,9 +195,9 @@ def render_dashboard(history: list[LinkCheckHistoryItem], user: CurrentUserRespo
 
 
 def render_link_check(link_check: LinkCheckResponse) -> str:
-    """Render a link-check result supplied by the API."""
+    """Render the one-request result supplied directly by the API."""
     rows = "".join(
-        "<tr>"
+        f'<tr data-element-type="{escape(link.element_type)}" data-visibility="{escape(link.visibility)}">'
         f"<td>{escape(link.element_type)}</td>"
         f"<td>{escape(link.visibility)}</td>"
         f"<td>{escape(link.object_reference or '')}</td>"
@@ -177,11 +208,11 @@ def render_link_check(link_check: LinkCheckResponse) -> str:
         "</tr>"
         for link in link_check.links
     )
-    is_processing = link_check.status in {"queued", "running"}
-    refresh_head = '<meta http-equiv="refresh" content="2">' if is_processing else ""
+    total_records = len(link_check.links)
     links_summary = (
-        f'<p class="muted">{link_check.total_links} hidden link(s) found.</p>'
-        if link_check.total_links
+        f'<p class="muted" id="findings-total" data-total="{total_records}">'
+        f'{total_records} hidden link(s) found in this URL.</p>'
+        if link_check.links
         else '<p class="muted">No hidden links found in the readable page content.</p>'
     )
     limitations = "".join(f"<li>{escape(item)}</li>" for item in link_check.limitations)
@@ -191,41 +222,67 @@ def render_link_check(link_check: LinkCheckResponse) -> str:
         else ""
     )
     results_table = (
+        '<label>Visibility <select id="visibility-filter"><option value="all">All</option><option value="direct">Direct</option><option value="indirect">Indirect</option></select></label>'
+        '<label>Type <select id="type-filter"><option value="all">All</option><option value="text">Text</option><option value="image">Image</option><option value="background">Background</option></select></label>'
         '<div class="results-scroll"><table class="result-table"><thead><tr><th>Type</th><th>Visibility</th><th>Object</th><th>Source</th><th>Actual URL</th><th>Visible text</th><th>Alt text</th></tr></thead>'
         f'<tbody>{rows}</tbody></table></div>'
+        '<nav class="pagination" id="results-pagination" aria-label="Inspection result pages">'
+        '<button type="button" id="results-previous">Previous</button>'
+        '<span id="results-page-status" aria-live="polite"></span>'
+        '<button type="button" id="results-next">Next</button>'
+        '<label for="results-page-size">Rows per page <select id="results-page-size">'
+        '<option value="30" selected>30</option><option value="50">50</option><option value="100">100</option>'
+        '</select></label></nav>'
         if rows
         else ""
     )
-    pagination = ""
-    if link_check.total_pages > 1:
-        previous = (
-            f'<a href="?page={link_check.page - 1}&page_size={link_check.page_size}">Previous</a>'
-            if link_check.page > 1
-            else ""
-        )
-        next_page = (
-            f'<a href="?page={link_check.page + 1}&page_size={link_check.page_size}">Next</a>'
-            if link_check.page < link_check.total_pages
-            else ""
-        )
-        pagination = (
-            f'<nav class="pagination" aria-label="Inspection result pages">{previous}'
-            f'<span>Page {link_check.page} of {link_check.total_pages} · {link_check.total_links} results</span>'
-            f'{next_page}<label>Rows <select onchange="location.href=\'?page=1&page_size=\' + this.value">'
-            + "".join(
-                f'<option value="{size}"{" selected" if size == link_check.page_size else ""}>{size}</option>'
-                for size in (20, 50, 100)
-            )
-            + "</select></label></nav>"
-        )
+    dom_context = (
+        f'<details class="dom-context"><summary>DOM excerpt</summary><pre>{escape(link_check.dom_excerpt)}</pre></details>'
+        if link_check.dom_excerpt
+        else ""
+    )
+    filter_script = """<script>
+document.addEventListener('DOMContentLoaded', () => {
+const filters = [document.getElementById('visibility-filter'), document.getElementById('type-filter')];
+const pageSizeSelect = document.getElementById('results-page-size');
+const previousButton = document.getElementById('results-previous');
+const nextButton = document.getElementById('results-next');
+const pageStatus = document.getElementById('results-page-status');
+const resultRows = Array.from(document.querySelectorAll('.result-table tbody tr'));
+let currentPage = 1;
+function filterFindings() {
+  const [visibility, type] = filters.map(select => select.value);
+  const matchingRows = resultRows.filter(row =>
+    (visibility === 'all' || row.dataset.visibility === visibility)
+    && (type === 'all' || row.dataset.elementType === type)
+  );
+  const pageSize = Number(pageSizeSelect.value);
+  const pageCount = Math.max(1, Math.ceil(matchingRows.length / pageSize));
+  currentPage = Math.min(currentPage, pageCount);
+  const firstRow = (currentPage - 1) * pageSize;
+  const visibleRows = new Set(matchingRows.slice(firstRow, firstRow + pageSize));
+  resultRows.forEach(row => {
+    row.hidden = !visibleRows.has(row);
+  });
+  pageStatus.textContent = `Page ${currentPage} of ${pageCount} · ${matchingRows.length} shown`;
+  previousButton.disabled = currentPage <= 1;
+  nextButton.disabled = currentPage >= pageCount;
+}
+filters.forEach(select => select.addEventListener('change', () => { currentPage = 1; filterFindings(); }));
+pageSizeSelect.addEventListener('change', () => { currentPage = 1; filterFindings(); });
+previousButton.addEventListener('click', () => { currentPage -= 1; filterFindings(); });
+nextButton.addEventListener('click', () => { currentPage += 1; filterFindings(); });
+filterFindings();
+});
+</script>""" if link_check.links else ""
     body = (
         '<div class="site-shell"><header class="topbar">'
         f'{_brand()}</header><main class="page-content"><section class="panel">'
         f'<span class="eyebrow">Inspection / {escape(link_check.status)}</span>'
         f'<h1 class="inspection-title">Inspection result</h1>'
         f'<label class="inspection-url">Submitted URL<input type="text" value="{escape(link_check.submitted_url, quote=True)}" readonly></label>'
-        f'<p class="muted">DOM reference: {escape(link_check.dom_reference or "Not retained")}</p>'
-        f'{links_summary}{limitations_block}{results_table}{pagination}<a class="back-link" href="/">Back to dashboard</a>'
+        f'<p class="muted">Checked at {escape(link_check.checked_at.isoformat())}</p>'
+        f'{links_summary}{limitations_block}{dom_context}{results_table}<a class="back-link" href="/">Back to dashboard</a>'
         '</section></main></div>'
     )
-    return _document("Inspection - Hidden Link Checker", body, refresh_head)
+    return _document("Inspection - Hidden Link Checker", body, filter_script)

@@ -53,6 +53,9 @@ Hiển thị hidden link trong response của lần kiểm tra; chỉ lưu URL h
 - Lưu URL và thời điểm kiểm tra theo user để tải lại lịch sử.
 - API-first: authentication, kiểm tra URL, đọc và xóa URL history đều đi qua API.
 - PostgreSQL làm database chính cho user, auth session và URL history.
+- Chromium render JavaScript trong browser context tách biệt cho từng lần kiểm tra.
+- Mọi request mạng do trang tạo ra trong lúc render đều bị chặn; HTML fetcher chỉ
+	truy cập URL đầu vào và redirect được kiểm tra SSRF.
 
 ## Kiến trúc và công nghệ
 
@@ -62,7 +65,8 @@ Hiển thị hidden link trong response của lần kiểm tra; chỉ lưu URL h
 - **Authentication:** Google OAuth/OIDC.
 - **Database:** PostgreSQL với migration, foreign key, transaction và index cho
 	ownership/lịch sử.
-- **Processing:** browser worker cô lập chỉ truy cập URL đầu vào.
+- **Processing:** HTTP fetcher kiểm tra SSRF lấy URL đầu vào; Chromium chạy JavaScript
+	trong context sạch, chặn mọi request mạng do trang tạo ra.
 - **Frontend:** dashboard gọi API; không truy cập database trực tiếp.
 
 ## Cài đặt
@@ -96,7 +100,12 @@ Cài đặt project và công cụ test:
 ```bash
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
+python -m playwright install chromium
 ```
+
+Ứng dụng tự dùng Edge/Chrome có sẵn trên Windows hoặc Chromium do Playwright cài.
+Có thể đặt `HIDDEN_LINK_CHECKER_BROWSER_EXECUTABLE` để chỉ định executable trong
+môi trường triển khai.
 
 Google OAuth credentials và cấu hình PostgreSQL sẽ được cung cấp qua biến môi
 trường khi web application được triển khai. Sao chép `.env.example` thành
@@ -212,7 +221,8 @@ URL người dùng nhập là một ranh giới bảo mật quan trọng. Implem
 - Không fetch, mở hoặc điều hướng tới link được phát hiện trong DOM.
 - Áp dụng timeout, giới hạn response size, CPU, memory, concurrency và redirect.
 - Không gửi cookie, authorization header hoặc application secret tới URL đầu vào.
-- Chạy browser worker trong sandbox cô lập.
+- JavaScript chạy trong browser; mọi network request của trang bị chặn. Trang phụ thuộc
+	tài nguyên ngoài để render đầy đủ trả về trạng thái `partial`.
 - Kiểm tra Google authentication và ownership cho mọi thao tác dữ liệu.
 - Không ghi OAuth credential, query string nhạy cảm hoặc DOM không cần thiết vào log.
 
@@ -234,7 +244,7 @@ URL người dùng nhập là một ranh giới bảo mật quan trọng. Implem
 │   │   ├── repositories/     # persistence ports/adapters
 │   │   ├── scanner/          # URL policy, SSRF và extractor
 │   │   ├── services/         # use cases
-│   │   └── workers/          # queue/worker ports
+│   │   └── workers/          # bounded synchronous page fetcher
 │   ├── hidden_link_checker_web/
 │   │   ├── controllers/      # dashboard routes
 │   │   ├── services/         # HTTP API client

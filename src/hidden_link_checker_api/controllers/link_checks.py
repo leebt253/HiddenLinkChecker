@@ -1,16 +1,14 @@
-"""HTTP endpoints for link check creation, history, detail and deletion."""
+"""Synchronous URL check and ownership-scoped history endpoints."""
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from hidden_link_checker_api.domain.models import AuthenticatedUser, LinkCheck
-from hidden_link_checker_api.scanner.urls import InvalidInputUrlError
 from hidden_link_checker_api.services.auth import AuthenticationService
 from hidden_link_checker_api.services.link_checks import LinkCheckService
 from shared_contracts.api_models import (
     CreateLinkCheckRequest,
-    CreateLinkCheckResponse,
     LinkCheckHistoryItem,
     LinkCheckResponse,
     LinkResultResponse,
@@ -32,31 +30,23 @@ def get_current_user(request: Request) -> AuthenticatedUser:
 
 
 def get_link_check_service(request: Request) -> LinkCheckService:
-    """Return the service assembled by the API application factory."""
     return request.app.state.link_check_service
 
 
-def _to_response(link_check: LinkCheck, page: int, page_size: int) -> LinkCheckResponse:
-    total_links = len(link_check.links)
-    start = (page - 1) * page_size
-    page_links = link_check.links[start : start + page_size]
-    total_pages = (total_links + page_size - 1) // page_size if total_links else 0
+def _to_response(link_check: LinkCheck) -> LinkCheckResponse:
     return LinkCheckResponse(
         check_id=link_check.id,
         status=link_check.status.value,
         submitted_url=link_check.submitted_url,
-        normalized_url=link_check.normalized_url,
+        normalized_url=link_check.normalized_url or None,
         final_url=link_check.final_url,
         http_status=link_check.http_status,
         error_code=link_check.error_code,
-        dom_reference=link_check.dom_reference if link_check.include_dom else None,
-        notes=link_check.notes,
+        dom_excerpt=link_check.dom_excerpt,
         limitations=link_check.limitations,
-        created_at=link_check.created_at,
-        completed_at=link_check.completed_at,
+        checked_at=link_check.created_at,
         links=[
             LinkResultResponse(
-                id=result.id,
                 element_type=result.element_type.value,
                 object_reference=result.object_reference,
                 source_url=result.source_url,
@@ -66,31 +56,19 @@ def _to_response(link_check: LinkCheck, page: int, page_size: int) -> LinkCheckR
                 alt_text=result.alt_text,
                 position=result.position,
             )
-            for result in page_links
+            for result in link_check.links
         ],
-        total_links=total_links,
-        page=page,
-        page_size=page_size,
-        total_pages=total_pages,
     )
 
 
-@router.post("/link-checks", response_model=CreateLinkCheckResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/link-checks", response_model=LinkCheckResponse)
 def create_link_check(
     payload: CreateLinkCheckRequest,
     user: AuthenticatedUser = Depends(get_current_user),
     service: LinkCheckService = Depends(get_link_check_service),
-) -> CreateLinkCheckResponse:
-    """Queue a link check for the authenticated user."""
-    try:
-        link_check = service.create(user, payload.url, payload.include_dom)
-    except InvalidInputUrlError as error:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
-    return CreateLinkCheckResponse(
-        check_id=link_check.id,
-        status=link_check.status.value,
-        created_at=link_check.created_at,
-    )
+) -> LinkCheckResponse:
+    """Inspect one submitted URL and return all findings in this response."""
+    return _to_response(service.check(user, payload.url))
 
 
 @router.get("/me/link-checks", response_model=list[LinkCheckHistoryItem])
@@ -98,43 +76,20 @@ def list_link_checks(
     user: AuthenticatedUser = Depends(get_current_user),
     service: LinkCheckService = Depends(get_link_check_service),
 ) -> list[LinkCheckHistoryItem]:
-    """List link checks owned by the authenticated user."""
+    """List only the user's URL and check timestamp history."""
     return [
-        LinkCheckHistoryItem(
-            check_id=link_check.id,
-            status=link_check.status.value,
-            submitted_url=link_check.submitted_url,
-            created_at=link_check.created_at,
-            completed_at=link_check.completed_at,
-        )
-        for link_check in service.list(user)
+        LinkCheckHistoryItem(check_id=item.id, url=item.url, checked_at=item.checked_at)
+        for item in service.list_history(user)
     ]
 
 
-@router.get("/link-checks/{check_id}", response_model=LinkCheckResponse)
-def get_link_check(
-    check_id: UUID,
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=20, le=100),
-    user: AuthenticatedUser = Depends(get_current_user),
-    service: LinkCheckService = Depends(get_link_check_service),
-) -> LinkCheckResponse:
-    """Return one owned link check without revealing cross-account records."""
-    link_check = service.get(user, check_id)
-    if link_check is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Link check not found.")
-    return _to_response(link_check, page, page_size)
-
-
-@router.delete("/link-checks/{check_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_link_check(
+@router.delete("/me/link-checks/{check_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_link_check_history(
     check_id: UUID,
     user: AuthenticatedUser = Depends(get_current_user),
     service: LinkCheckService = Depends(get_link_check_service),
 ) -> Response:
-    """Delete one owned link check and its dependent records."""
-    if not service.delete(user, check_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Link check not found.")
+    """Delete one history item without exposing records belonging to other users."""
+    if not service.delete_history(user, check_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="URL history item not found.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-

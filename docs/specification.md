@@ -150,9 +150,14 @@ Response tạo scan tối thiểu:
   "check_id": "scan_123",
   "status": "completed",
   "submitted_url": "https://example.com",
+  "checked_at": "2026-09-25T10:00:00Z",
   "links": []
 }
 ```
+
+`status` chỉ nhận `completed`, `partial` hoặc `failed`; lỗi xử lý có kiểm soát
+được trả trong response này cùng `error_code`/`limitations`. Request không hợp
+lệ ở mức JSON/schema dùng HTTP 422.
 
 ## 6. Data model
 
@@ -171,7 +176,7 @@ của request kiểm tra tương ứng và không có bảng lưu trữ riêng.
 ## 7. Non-functional requirements
 
 - **Security:** SSRF protection, sandbox worker, authentication và ownership checks.
-- **Privacy:** DOM và URL có retention; hạn chế log query string nhạy cảm.
+- **Privacy:** DOM excerpt chỉ có trong response, không persist; chỉ URL và thời điểm check được lưu theo retention policy. Hạn chế log query string nhạy cảm.
 - **Reliability:** timeout, 403, 429, SSL error và HTML lỗi phải trả trạng thái có kiểm soát.
 - **Performance:** static page nhỏ phải hoàn tất trong timeout cấu hình; dashboard không cần tải toàn bộ HTML.
 - **Maintainability:** ứng dụng tổ chức theo MVC dễ đọc và maintenance; extractor,
@@ -182,7 +187,7 @@ của request kiểm tra tương ứng và không có bảng lưu trữ riêng.
 
 ## 8. Known limitations
 
-Kết quả có thể không đầy đủ khi trang dùng JavaScript động, iframe cross-origin, shadow DOM, yêu cầu đăng nhập, CAPTCHA, stylesheet không truy cập được hoặc vượt giới hạn tài nguyên. System phải ghi nhận limitation thay vì coi scan là toàn diện.
+Kết quả có thể không đầy đủ khi trang cần request mạng phụ trợ để render, dùng iframe cross-origin, shadow DOM, yêu cầu đăng nhập, CAPTCHA hoặc vượt giới hạn tài nguyên. Mọi request do trang tạo ra trong browser đều bị chặn; system phải ghi nhận limitation thay vì coi scan là toàn diện.
 
 ## 9. Acceptance criteria
 

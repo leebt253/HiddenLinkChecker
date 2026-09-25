@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 
+import httpx
 from fastapi import FastAPI
 
 from hidden_link_checker_api.config import ApiSettings
@@ -13,10 +14,11 @@ from hidden_link_checker_api.repositories.auth import (
     PostgreSQLAuthRepository,
 )
 from hidden_link_checker_api.repositories.link_checks import (
-    InMemoryLinkCheckRepository,
-    LinkCheckRepository,
-    PostgreSQLLinkCheckRepository,
+    InMemoryUrlCheckHistoryRepository,
+    PostgreSQLUrlCheckHistoryRepository,
+    UrlCheckHistoryRepository,
 )
+from hidden_link_checker_api.scanner.browser_renderer import BrowserPageRenderer
 from hidden_link_checker_api.services.auth import (
     AuthenticationService,
     GoogleIdTokenVerifier,
@@ -24,31 +26,38 @@ from hidden_link_checker_api.services.auth import (
 )
 from hidden_link_checker_api.services.link_checks import LinkCheckService
 from hidden_link_checker_api.workers.link_check_worker import LinkCheckWorker
-from hidden_link_checker_api.workers.queue import InMemoryLinkCheckQueue
 
 
-def create_app(settings: ApiSettings | None = None, auth_repository: AuthRepository | None = None) -> FastAPI:
+def create_app(
+    settings: ApiSettings | None = None,
+    auth_repository: AuthRepository | None = None,
+    link_check_repository: UrlCheckHistoryRepository | None = None,
+    link_check_transport: httpx.BaseTransport | None = None,
+) -> FastAPI:
     """Create the API application with replaceable infrastructure adapters."""
     resolved_settings = settings or ApiSettings()
     app = FastAPI(title="Hidden Link Checker API", version="0.1.0")
     app.state.settings = resolved_settings
     app.state.authentication_service = _build_authentication_service(resolved_settings, auth_repository)
-    link_check_repository: LinkCheckRepository = (
-        PostgreSQLLinkCheckRepository(resolved_settings.database_url)
+    resolved_link_check_repository = link_check_repository or (
+        PostgreSQLUrlCheckHistoryRepository(resolved_settings.database_url)
         if resolved_settings.database_url
-        else InMemoryLinkCheckRepository()
+        else InMemoryUrlCheckHistoryRepository()
     )
     link_check_worker = LinkCheckWorker(
-        link_check_repository,
+        transport=link_check_transport,
         timeout_seconds=resolved_settings.scan_timeout_seconds,
         max_redirects=resolved_settings.scan_max_redirects,
         max_response_bytes=resolved_settings.scan_max_response_bytes,
+        max_concurrent=resolved_settings.scan_max_concurrent,
+        renderer=BrowserPageRenderer(
+            executable_path=resolved_settings.browser_executable_path,
+            timeout_seconds=resolved_settings.scan_timeout_seconds,
+        ),
     )
     app.state.link_check_service = LinkCheckService(
-        repository=link_check_repository,
-        queue=InMemoryLinkCheckQueue(
-            link_check_worker.process, max_concurrent=resolved_settings.scan_max_concurrent
-        ),
+        repository=resolved_link_check_repository,
+        processor=link_check_worker,
     )
     app.include_router(auth_router)
     app.include_router(link_checks_router)

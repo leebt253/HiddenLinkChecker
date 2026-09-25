@@ -10,7 +10,10 @@ class InvalidInputUrlError(ValueError):
 def normalize_input_url(submitted_url: str) -> str:
     """Return a normalized absolute HTTP(S) URL or raise InvalidInputUrlError."""
     candidate = submitted_url.strip()
-    parsed_url = urlsplit(candidate)
+    try:
+        parsed_url = urlsplit(candidate)
+    except ValueError as error:
+        raise InvalidInputUrlError("The submitted URL is malformed.") from error
 
     if parsed_url.scheme not in {"http", "https"}:
         raise InvalidInputUrlError("Only http and https URLs are supported.")

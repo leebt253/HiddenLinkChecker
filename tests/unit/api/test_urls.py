@@ -7,7 +7,10 @@ def test_normalize_input_url_accepts_absolute_https_url() -> None:
     assert normalize_input_url(" HTTPS://Example.COM/path#section ") == "https://example.com/path"
 
 
-@pytest.mark.parametrize("submitted_url", ["ftp://example.com", "/relative", "https:///missing-host"])
+@pytest.mark.parametrize(
+    "submitted_url",
+    ["ftp://example.com", "/relative", "https:///missing-host", "http://[invalid-ipv6/"],
+)
 def test_normalize_input_url_rejects_unsupported_or_relative_urls(submitted_url: str) -> None:
     with pytest.raises(InvalidInputUrlError):
         normalize_input_url(submitted_url)

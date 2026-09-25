@@ -17,6 +17,11 @@ URL được phát hiện; link hiển thị trực tiếp chỉ là hidden link
 Kết quả hidden link chỉ tồn tại trong phạm vi một lần gọi API; hệ thống không
 lưu lại chi tiết hidden link sau khi đã phản hồi.
 
+Browser render bằng Chromium trong context mới cho từng request. Mọi request do
+trang tạo ra đều bị chặn; vì vậy link phát hiện trong DOM không được truy cập.
+Khi trang cần tài nguyên ngoài để hoàn tất UI, response ghi limitation `partial`;
+JavaScript inline vẫn chạy để tạo DOM động.
+
 Luồng xử lý chỉ fetch/render **URL đầu vào** để lấy DOM. Hệ thống chỉ phân tích
 `href`, `src`, `srcset`, CSS background và các thuộc tính liên quan trong DOM;
 không tự động mở, fetch, redirect hoặc kiểm tra các hidden link được phát hiện.

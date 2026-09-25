@@ -12,9 +12,8 @@ BACKGROUND_URL_PATTERN = re.compile(r"url\(\s*(['\"]?)(.*?)\1\s*\)", re.IGNORECA
 class HiddenLinkExtractor(HTMLParser):
     """Parse text, image and inline-background URLs from an HTML document."""
 
-    def __init__(self, link_check_id: object, final_url: str) -> None:
+    def __init__(self, final_url: str) -> None:
         super().__init__(convert_charrefs=True)
-        self._link_check_id = link_check_id
         self._final_url = final_url
         self._links: list[LinkResult] = []
         self._anchor_href: str | None = None
@@ -118,7 +117,6 @@ class HiddenLinkExtractor(HTMLParser):
         alt_text: str | None = None,
     ) -> LinkResult:
         return LinkResult(
-            link_check_id=self._link_check_id,
             element_type=element_type,
             object_reference=object_reference,
             source_url=source_url,
@@ -129,9 +127,9 @@ class HiddenLinkExtractor(HTMLParser):
         )
 
 
-def extract_findings(html: str, final_url: str, link_check_id: object) -> list[LinkResult]:
+def extract_findings(html: str, final_url: str) -> list[LinkResult]:
     """Extract supported DOM URLs as data only; this function performs no I/O."""
-    extractor = HiddenLinkExtractor(link_check_id=link_check_id, final_url=final_url)
+    extractor = HiddenLinkExtractor(final_url=final_url)
     extractor.feed(html)
     extractor.close()
     return extractor.findings()

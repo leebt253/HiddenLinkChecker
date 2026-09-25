@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from threading import BoundedSemaphore
+from time import monotonic
 from urllib.parse import urljoin
-from uuid import UUID
 
 import httpx
 
-from hidden_link_checker_api.domain.models import LinkCheckStatus
-from hidden_link_checker_api.repositories.link_checks import LinkCheckRepository
+from hidden_link_checker_api.domain.models import LinkCheck, LinkCheckStatus
+from hidden_link_checker_api.scanner.browser_renderer import BrowserPageRenderer
 from hidden_link_checker_api.scanner.extractor import extract_findings
 from hidden_link_checker_api.scanner.ssrf import (
     UnsafeNavigationUrlError,
@@ -17,54 +18,86 @@ from hidden_link_checker_api.scanner.ssrf import (
 )
 from hidden_link_checker_api.scanner.urls import InvalidInputUrlError
 
+MAX_DOM_EXCERPT_CHARACTERS = 12_000
+
 
 class LinkCheckFetchError(RuntimeError):
     """Raised when the submitted page cannot produce a usable document."""
 
 
 class LinkCheckWorker:
-    """Process one link check without ever requesting discovered hidden links."""
+    """Synchronously fetch the submitted URL; findings are never navigated to."""
 
     def __init__(
         self,
-        repository: LinkCheckRepository,
         *,
         transport: httpx.BaseTransport | None = None,
         timeout_seconds: float = 10.0,
         max_redirects: int = 5,
         max_response_bytes: int = 2 * 1024 * 1024,
+        max_concurrent: int = 4,
+        renderer: BrowserPageRenderer | None = None,
     ) -> None:
-        self._repository = repository
         self._transport = transport
         self._timeout = timeout_seconds
         self._max_redirects = max_redirects
         self._max_response_bytes = max_response_bytes
+        self._slots = BoundedSemaphore(max_concurrent)
+        self._renderer = renderer or BrowserPageRenderer(timeout_seconds=timeout_seconds)
 
-    def process(self, check_id: UUID) -> None:
-        """Fetch and parse a queued check, recording a controlled lifecycle result."""
-        link_check = self._repository.get_by_id(check_id)
-        if link_check is None:
+    def process(self, link_check: LinkCheck) -> None:
+        """Fetch only the submitted page and attach findings to this request object."""
+        deadline = monotonic() + self._timeout
+        if not self._slots.acquire(timeout=self._timeout):
+            link_check.limitations.append("The URL check exceeded the configured concurrency limit.")
+            link_check.error_code = "timeout"
+            link_check.status = LinkCheckStatus.FAILED
+            link_check.completed_at = datetime.now(UTC)
             return
-        link_check.status = LinkCheckStatus.RUNNING
         try:
-            html, final_url, http_status, limitations = self._fetch_document(link_check.normalized_url)
+            html, final_url, http_status, limitations = self._fetch_document(
+                link_check.normalized_url, deadline
+            )
+            remaining_seconds = deadline - monotonic()
+            if remaining_seconds <= 0:
+                raise httpx.TimeoutException("The URL check exceeded its configured timeout.")
+            rendered = self._renderer.render(html, final_url, timeout_seconds=remaining_seconds)
+            html = rendered.html
+            limitations.extend(rendered.limitations)
+            rendered_size = len(html.encode("utf-8"))
+            if rendered_size > self._max_response_bytes:
+                html = html.encode("utf-8")[: self._max_response_bytes].decode(
+                    "utf-8", errors="ignore"
+                )
+                limitations.append("The rendered DOM exceeded the configured size limit and was truncated.")
             link_check.final_url = final_url
             link_check.http_status = http_status
-            link_check.links = extract_findings(html, final_url, link_check.id)
-            link_check.dom_reference = f"inline:{link_check.id}" if link_check.include_dom else None
+            link_check.links = extract_findings(html, final_url)
+            link_check.dom_excerpt = html[:MAX_DOM_EXCERPT_CHARACTERS]
+            if len(html) > MAX_DOM_EXCERPT_CHARACTERS:
+                limitations.append("The displayed DOM excerpt was truncated.")
             link_check.limitations.extend(limitations)
             link_check.status = LinkCheckStatus.PARTIAL if limitations else LinkCheckStatus.COMPLETED
-        except (InvalidInputUrlError, UnsafeNavigationUrlError, httpx.HTTPError, LinkCheckFetchError) as error:
+        except (
+            InvalidInputUrlError,
+            UnsafeNavigationUrlError,
+            httpx.HTTPError,
+            LinkCheckFetchError,
+        ) as error:
             link_check.limitations.append(str(error))
             link_check.error_code = _error_code(error)
             link_check.status = LinkCheckStatus.FAILED
+        except Exception:  # noqa: BLE001 - convert unexpected worker failures to controlled results.
+            link_check.limitations.append("The input URL could not be processed.")
+            link_check.error_code = "processing_failed"
+            link_check.status = LinkCheckStatus.FAILED
         finally:
+            self._slots.release()
             link_check.completed_at = datetime.now(UTC)
-            save_processed = getattr(self._repository, "save_processed", None)
-            if save_processed is not None:
-                save_processed(link_check)
 
-    def _fetch_document(self, submitted_url: str) -> tuple[str, str, int, list[str]]:
+    def _fetch_document(
+        self, submitted_url: str, deadline: float
+    ) -> tuple[str, str, int, list[str]]:
         current_url = ensure_safe_navigation_url(submitted_url)
         limitations: list[str] = []
         with httpx.Client(
@@ -75,7 +108,10 @@ class LinkCheckWorker:
             headers={"User-Agent": "HiddenLinkChecker/0.1"},
         ) as client:
             for redirect_count in range(self._max_redirects + 1):
-                with client.stream("GET", current_url) as response:
+                remaining_seconds = deadline - monotonic()
+                if remaining_seconds <= 0:
+                    raise httpx.TimeoutException("The URL check exceeded its configured timeout.")
+                with client.stream("GET", current_url, timeout=remaining_seconds) as response:
                     if 300 <= response.status_code < 400:
                         location = response.headers.get("location")
                         if not location:

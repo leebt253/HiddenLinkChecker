@@ -7,10 +7,8 @@ from uuid import UUID, uuid4
 
 
 class LinkCheckStatus(StrEnum):
-    """States in the asynchronous link-check lifecycle."""
+    """Final states returned by one synchronous URL check."""
 
-    QUEUED = "queued"
-    RUNNING = "running"
     COMPLETED = "completed"
     PARTIAL = "partial"
     FAILED = "failed"
@@ -111,9 +109,8 @@ def _hash_secret(value: str) -> bytes:
 
 @dataclass(frozen=True, slots=True)
 class LinkResult:
-    """A parsed URL retained as data without being requested by the system."""
+    """A parsed URL returned only in the response for the current request."""
 
-    link_check_id: UUID
     element_type: ElementType
     object_reference: str | None
     source_url: str
@@ -122,25 +119,32 @@ class LinkResult:
     visible_text: str | None = None
     alt_text: str | None = None
     position: dict[str, float] | None = None
-    id: UUID = field(default_factory=uuid4)
 
 
 @dataclass(slots=True)
 class LinkCheck:
-    """An asynchronously processed URL owned by one authenticated user."""
+    """Ephemeral scan state; never persist this object or its links."""
 
     user_id: UUID
     submitted_url: str
     normalized_url: str
-    include_dom: bool
     id: UUID = field(default_factory=uuid4)
-    status: LinkCheckStatus = LinkCheckStatus.QUEUED
+    status: LinkCheckStatus = LinkCheckStatus.COMPLETED
     final_url: str | None = None
     http_status: int | None = None
     error_code: str | None = None
-    dom_reference: str | None = None
+    dom_excerpt: str | None = None
     limitations: list[str] = field(default_factory=list)
-    notes: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
     links: list[LinkResult] = field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
+class UrlCheckHistory:
+    """The only long-lived record created by a link-check request."""
+
+    id: UUID
+    user_id: UUID
+    url: str
+    checked_at: datetime

@@ -61,6 +61,8 @@ Sau khi phản hồi, API lưu một bản ghi lịch sử tối giản (`id`, `
   "submitted_url": "https://example.com",
   "normalized_url": "https://example.com/",
   "final_url": "https://example.com/home",
+  "checked_at": "2026-09-25T10:00:00Z",
+  "dom_excerpt": "<html>…</html>",
   "links": [
     {
       "element_type": "image",
@@ -75,6 +77,15 @@ Sau khi phản hồi, API lưu một bản ghi lịch sử tối giản (`id`, `
   ]
 }
 ```
+
+`status` là `completed`, `partial` hoặc `failed`. Lỗi URL/fetch/SSRF có kiểm soát
+được trả trong cùng response với HTTP 200 và trường `error_code`/`limitations`;
+request không hợp lệ ở mức JSON/schema vẫn dùng HTTP 422.
+`dom_excerpt` được giới hạn độ dài, lấy sau khi Chromium render JavaScript, hiển
+thị như văn bản đã escape trên dashboard và chỉ tồn tại trong response. Browser
+chặn toàn bộ request do trang tạo ra (image, stylesheet, script ngoài, XHR/fetch,
+iframe, navigation); chỉ HTTP fetcher truy cập URL đầu vào và redirect đã xác minh.
+Bảng history không chứa DOM hoặc scan state.
 
 Mọi kết quả trong response là hidden link. `visibility = direct` biểu thị link
 hiển thị trực tiếp; `visibility = indirect` biểu thị link nằm sau image,

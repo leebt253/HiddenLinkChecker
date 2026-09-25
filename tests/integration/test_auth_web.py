@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import httpx
@@ -5,7 +6,12 @@ from fastapi.testclient import TestClient
 
 from hidden_link_checker_web.config import WebSettings
 from hidden_link_checker_web.main import create_app
-from shared_contracts.api_models import CurrentUserResponse, LinkCheckHistoryItem
+from shared_contracts.api_models import (
+    CurrentUserResponse,
+    LinkCheckHistoryItem,
+    LinkCheckResponse,
+    LinkResultResponse,
+)
 
 
 class FakeApiClient:
@@ -30,6 +36,27 @@ class FakeApiClient:
 
     async def list_link_checks(self, cookies: object) -> list[LinkCheckHistoryItem]:
         return []
+
+    async def create_link_check(self, url: str, cookies: object) -> LinkCheckResponse:
+        return LinkCheckResponse(
+            check_id=uuid4(),
+            status="completed",
+            submitted_url=url,
+            normalized_url=url,
+            final_url=url,
+            dom_excerpt='<a href="/offer">Offer</a>',
+            checked_at=datetime.now(UTC),
+            links=[
+                LinkResultResponse(
+                    element_type="text",
+                    object_reference="promo",
+                    source_url="/offer",
+                    actual_url="https://example.test/offer",
+                    visibility="direct",
+                    visible_text="Offer",
+                )
+            ],
+        )
 
     def google_login_url(self) -> str:
         return "http://api.test/v1/auth/google/start"
@@ -83,3 +110,16 @@ def test_unknown_web_route_uses_custom_error_page() -> None:
     assert response.status_code == 404
     assert "Page not found" in response.text
     assert "Return to dashboard" in response.text
+
+
+def test_url_submission_renders_the_same_synchronous_api_result() -> None:
+    client, api_client = _client()
+    api_client.authenticated = True
+
+    response = client.post("/link-checks", data={"url": "https://example.test"})
+
+    assert response.status_code == 200
+    assert "Inspection result" in response.text
+    assert "https://example.test/offer" in response.text
+    assert "&lt;a href=&quot;/offer&quot;&gt;Offer&lt;/a&gt;" in response.text
+    assert "DOM reference" not in response.text

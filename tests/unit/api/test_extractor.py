@@ -1,5 +1,3 @@
-from uuid import uuid4
-
 from hidden_link_checker_api.domain.models import ElementType, Visibility
 from hidden_link_checker_api.scanner.extractor import extract_findings
 
@@ -11,7 +9,7 @@ def test_extract_findings_resolves_text_image_srcset_and_background_urls() -> No
     <div id="offer" style="background-image: url('/offer.png')"></div>
     """
 
-    results = extract_findings(html, "https://example.test/home", uuid4())
+    results = extract_findings(html, "https://example.test/home")
 
     assert [(result.element_type, result.visibility) for result in results] == [
         (ElementType.TEXT, Visibility.DIRECT),
