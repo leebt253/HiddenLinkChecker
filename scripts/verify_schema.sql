@@ -14,7 +14,7 @@ FROM pg_type AS t
 JOIN pg_enum AS e ON e.enumtypid = t.oid
 JOIN pg_namespace AS n ON n.oid = t.typnamespace
 WHERE n.nspname = 'public'
-  AND t.typname IN ('user_status', 'link_check_status', 'link_element_type', 'link_visibility')
+  AND t.typname = 'user_status'
 GROUP BY t.typname
 ORDER BY t.typname;
 \echo 'COLUMNS'

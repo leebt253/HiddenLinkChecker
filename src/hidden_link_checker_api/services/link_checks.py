@@ -50,7 +50,6 @@ class LinkCheckService:
                 status=LinkCheckStatus.FAILED,
                 error_code="invalid_input_url",
                 limitations=[str(error)],
-                completed_at=now,
             )
         finally:
             self._repository.add(

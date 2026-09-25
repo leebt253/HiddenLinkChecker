@@ -104,7 +104,7 @@ python -m playwright install chromium
 ```
 
 Ứng dụng tự dùng Edge/Chrome có sẵn trên Windows hoặc Chromium do Playwright cài.
-Có thể đặt `HIDDEN_LINK_CHECKER_BROWSER_EXECUTABLE` để chỉ định executable trong
+Có thể đặt `HIDDEN_LINK_CHECKER_BROWSER_EXECUTABLE_PATH` để chỉ định executable trong
 môi trường triển khai.
 
 Sao chép `.env.example` thành `.env` để chạy local. Khi triển khai, đặt
@@ -112,6 +112,21 @@ Sao chép `.env.example` thành `.env` để chạy local. Khi triển khai, đ�
 OAuth credentials; không commit tệp `.env`. Production sẽ từ chối khởi động nếu
 thiếu `HIDDEN_LINK_CHECKER_DATABASE_URL`. In-memory URL history chỉ dùng khi
 `HIDDEN_LINK_CHECKER_ENVIRONMENT` là `development` hoặc `test`.
+
+Production cần cung cấp `HIDDEN_LINK_CHECKER_DATABASE_URL`, Google OAuth client
+ID/secret/redirect URI, `HIDDEN_LINK_CHECKER_WEB_BASE_URL` và
+`HIDDEN_LINK_CHECKER_API_BASE_URL`. Bật
+`HIDDEN_LINK_CHECKER_SESSION_COOKIE_SECURE=true` khi dùng HTTPS. Cấu hình giới hạn
+scan qua `HIDDEN_LINK_CHECKER_SCAN_TIMEOUT_SECONDS`,
+`HIDDEN_LINK_CHECKER_SCAN_MAX_REDIRECTS`,
+`HIDDEN_LINK_CHECKER_SCAN_MAX_RESPONSE_BYTES` và
+`HIDDEN_LINK_CHECKER_SCAN_MAX_CONCURRENT` (mặc định lần lượt là 10 giây, 5,
+2 MiB và 4). Google OAuth settings chưa được kiểm tra bắt buộc lúc khởi động;
+thiếu cấu hình sẽ làm endpoint đăng nhập trả `503`.
+
+Ứng dụng áp dụng timeout, redirect, kích thước response và concurrency limits.
+Mã hiện chưa đặt hard limit CPU/RAM cho Chromium; cần cấu hình giới hạn process
+hoặc container trước khi coi phần này là được kiểm soát trong production.
 
 ### Cấu hình Google OAuth
 
@@ -198,7 +213,8 @@ URL người dùng nhập là một ranh giới bảo mật quan trọng. Implem
 - Kết nối TCP được pin vào một IP công khai trong đúng tập IP đã xác minh để
   tránh DNS rebinding; từ chối địa chỉ reserved và metadata.
 - Không fetch, mở hoặc điều hướng tới link được phát hiện trong DOM.
-- Áp dụng timeout, giới hạn response size, CPU, memory, concurrency và redirect.
+- Áp dụng timeout, giới hạn response size, concurrency và redirect; hard limit
+  CPU/RAM cần được cung cấp ở cấp process/container khi triển khai.
 - Không gửi cookie, authorization header hoặc application secret tới URL đầu vào.
 - JavaScript chạy trong browser; mọi network request của trang bị chặn. Trang phụ thuộc
 	tài nguyên ngoài để render đầy đủ trả về trạng thái `partial`.
@@ -248,10 +264,10 @@ vi link extraction, ownership và security policy của MVP.
 
 - [Product recommendation](docs/recommendation.md)
 - [Product specification](docs/specification.md)
+- [FR/AC traceability and evidence](docs/traceability.md)
 - [API contract](docs/api-spec.md)
 - [Domain model](docs/domain-model.md)
-- [PostgreSQL database guide](docs/database-guide.md)
-- [Database connection configuration](docs/database-connection.md)
+- [PostgreSQL database and production configuration](docs/database-guide.md)
 - [Coding rules](docs/coding-rules.md)
 
 ## Giấy phép

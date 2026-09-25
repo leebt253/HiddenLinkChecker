@@ -15,7 +15,11 @@ các link được phát hiện.
 ```mermaid
 erDiagram
     USER ||--o{ URL_CHECK : owns
+    USER ||--o{ USER_SESSION : has
 ```
+
+`oauth_login_transactions` lưu tạm hash `state`/`nonce` và expiry trong thời gian
+hoàn tất OIDC; dữ liệu này chỉ phục vụ xác thực.
 
 ## 3. Entity
 
@@ -29,6 +33,13 @@ Fields chính: `id`, `google_subject`, `email`, `status`, `created_at`,
 `google_subject` chỉ dùng nội bộ để liên kết identity, không trả qua public API.
 Mọi dữ liệu kiểm tra phải được truy vấn theo authenticated `user_id`.
 
+### UserSession và OAuthLoginTransaction
+
+`UserSession` lưu hash opaque session token, `user_id`, expiry và thời điểm
+revoke/last seen. `OAuthLoginTransaction` lưu hash OIDC state/nonce cùng expiry.
+Các bảng được tạo bởi `migrations/0002_auth_sessions.sql`; không lưu plaintext
+session/OIDC token.
+
 ### UrlCheck
 
 Đại diện việc user đã yêu cầu kiểm tra một URL. Đây là bản ghi lịch sử duy nhất
@@ -39,6 +50,10 @@ Fields chính: `id`, `user_id`, `url`, `checked_at`.
 `UrlCheck` không lưu `status`, DOM, hay danh sách hidden link. Việc fetch/render
 URL đầu vào và trích xuất hidden link diễn ra trong cùng vòng đời của một request
 API và không có trạng thái trung gian cần theo dõi.
+
+`LinkCheckStatus` có đúng ba trạng thái kết thúc (`completed`, `partial`,
+`failed`) trên object request tạm thời. Không có trạng thái xử lý trung gian và
+không có cột trạng thái scan trong migration.
 
 ### LinkResult (giá trị tạm thời, không persist)
 

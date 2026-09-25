@@ -14,6 +14,10 @@ class UnsafeNavigationUrlError(ValueError):
     """Raised when a navigation target resolves to a prohibited address."""
 
 
+class NavigationDnsError(ValueError):
+    """Raised when the input host cannot be resolved to a usable address."""
+
+
 class SafeNavigationURL(str):
     """Normalized URL carrying the exact safe DNS answers to pin at connect time."""
 
@@ -50,12 +54,15 @@ def ensure_safe_navigation_url(candidate_url: str) -> SafeNavigationURL:
 def _resolve_addresses(hostname: str) -> set[ipaddress.IPv4Address | ipaddress.IPv6Address]:
     try:
         address_info = socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
-    except socket.gaierror as error:
-        raise UnsafeNavigationUrlError("The URL host could not be resolved.") from error
+    except OSError as error:
+        raise NavigationDnsError("The URL host could not be resolved.") from error
 
-    addresses = {ipaddress.ip_address(item[4][0]) for item in address_info}
+    try:
+        addresses = {ipaddress.ip_address(item[4][0]) for item in address_info}
+    except (IndexError, ValueError) as error:
+        raise NavigationDnsError("The URL host returned invalid DNS addresses.") from error
     if not addresses:
-        raise UnsafeNavigationUrlError("The URL host could not be resolved.")
+        raise NavigationDnsError("The URL host could not be resolved.")
     return addresses
 
 

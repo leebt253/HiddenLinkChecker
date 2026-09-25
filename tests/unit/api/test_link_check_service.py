@@ -8,7 +8,7 @@ from hidden_link_checker_api.domain.models import (
     UrlCheckHistory,
     Visibility,
 )
-from hidden_link_checker_api.repositories.link_checks import InMemoryUrlCheckHistoryRepository
+from hidden_link_checker_api.repositories.link_checks import InMemoryUrlCheckRepository
 from hidden_link_checker_api.services.link_checks import LinkCheckService
 
 
@@ -30,7 +30,7 @@ class SuccessfulProcessor:
 
 
 def test_check_returns_findings_and_persists_only_minimal_history() -> None:
-    repository = InMemoryUrlCheckHistoryRepository()
+    repository = InMemoryUrlCheckRepository()
     service = LinkCheckService(repository, SuccessfulProcessor())
     user = AuthenticatedUser(id=uuid4())
 
@@ -52,7 +52,7 @@ def test_check_returns_findings_and_persists_only_minimal_history() -> None:
 
 
 def test_invalid_input_returns_failed_result_and_minimal_history() -> None:
-    repository = InMemoryUrlCheckHistoryRepository()
+    repository = InMemoryUrlCheckRepository()
     service = LinkCheckService(repository, SuccessfulProcessor())
     user = AuthenticatedUser(id=uuid4())
 
@@ -65,7 +65,7 @@ def test_invalid_input_returns_failed_result_and_minimal_history() -> None:
 
 
 def test_history_access_and_delete_are_scoped_to_owner() -> None:
-    repository = InMemoryUrlCheckHistoryRepository()
+    repository = InMemoryUrlCheckRepository()
     service = LinkCheckService(repository, SuccessfulProcessor())
     owner = AuthenticatedUser(id=uuid4())
     another_user = AuthenticatedUser(id=uuid4())

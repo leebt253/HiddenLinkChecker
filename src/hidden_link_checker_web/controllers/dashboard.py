@@ -30,12 +30,6 @@ async def dashboard(request: Request, recent_page: int = Query(default=1, ge=1))
     return HTMLResponse(render_dashboard(history, user, recent_page=recent_page))
 
 
-@router.get("/link-checks", response_class=HTMLResponse)
-async def link_checks_page(request: Request, recent_page: int = Query(default=1, ge=1)) -> HTMLResponse:
-    """Expose the dashboard at the link-checks collection URL as well."""
-    return await dashboard(request, recent_page=recent_page)
-
-
 @router.post("/link-checks")
 async def create_link_check(
     request: Request,

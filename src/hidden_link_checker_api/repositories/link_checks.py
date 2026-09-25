@@ -91,9 +91,3 @@ def _to_history(row: dict[str, object]) -> UrlCheckHistory:
     return UrlCheckHistory(
         id=row["id"], user_id=row["user_id"], url=row["url"], checked_at=row["checked_at"]
     )
-
-
-# Backwards-compatible names retained for callers that refer to history explicitly.
-UrlCheckHistoryRepository = UrlCheckRepository
-InMemoryUrlCheckHistoryRepository = InMemoryUrlCheckRepository
-PostgreSQLUrlCheckHistoryRepository = PostgreSQLUrlCheckRepository

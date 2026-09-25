@@ -28,9 +28,19 @@ Google OAuth/OIDC là cơ chế đăng nhập duy nhất của MVP. Backend ph�
 `state`, `nonce`, redirect URI, issuer và chữ ký token theo cấu hình Google.
 Google subject được map vào `users.google_subject` unique.
 
-Backend phát hành session cookie server-side hoặc bearer token cho API. Cơ chế,
-expiry, logout, revocation và CSRF policy phải được chốt trước triển khai.
-Không lưu Google access token nếu API không gọi Google thay mặt user.
+Backend phát hành opaque server-side session cookie, đặt `HttpOnly` và
+`SameSite=Lax`; `Secure` phụ thuộc `HIDDEN_LINK_CHECKER_SESSION_COOKIE_SECURE`.
+Session token chỉ được lưu dưới dạng SHA-256 hash, mặc định hết hạn sau 7 ngày
+và bị revoke khi logout. OIDC `state`/`nonce` cũng được lưu dạng hash trong
+`oauth_login_transactions`. Không lưu Google access token.
+Cookie dùng `SameSite=Lax`; ứng dụng chưa có CSRF token riêng. Cần rà lại origin
+topology và CSRF controls khi cấu hình production.
+
+Google OAuth credentials là cấu hình runtime tùy chọn trong code: nếu thiếu,
+API vẫn có thể khởi động nhưng endpoint đăng nhập trả `503`. Deployment production
+phải cung cấp đủ `HIDDEN_LINK_CHECKER_GOOGLE_CLIENT_ID`,
+`HIDDEN_LINK_CHECKER_GOOGLE_CLIENT_SECRET` và
+`HIDDEN_LINK_CHECKER_GOOGLE_REDIRECT_URI`.
 
 API không trả OAuth secret, token, stack trace hoặc thông tin nội bộ.
 
@@ -49,8 +59,10 @@ URL đầu vào, trích xuất hidden link và trả toàn bộ kết quả tron
 (xem mục 5). Redirect của URL đầu vào phải được kiểm tra SSRF sau mỗi bước. API
 không fetch, mở, redirect hoặc điều hướng tới URL nào được phát hiện trong DOM.
 
-Sau khi phản hồi, API lưu một bản ghi lịch sử tối giản (`id`, `url`,
-`checked_at`) cho user; hidden link phát hiện được không được lưu lại.
+Sau khi xử lý request và trước khi gửi response, API lưu một bản ghi lịch sử tối
+giản (`id`, `user_id`, `url`, `checked_at`) cho user, kể cả khi kết quả là
+`partial`/`failed` hoặc URL bị validation từ chối. Hidden link, DOM và scan status
+không được lưu lại.
 
 ## 5. Link check response
 
@@ -108,15 +120,22 @@ verdict.
 - Chặn localhost, loopback, private IP, link-local, multicast và cloud metadata.
 - Chặn địa chỉ reserved/non-global; pin kết nối TCP vào IP đã xác minh, giữ
   hostname cho TLS và xác minh/pin lại sau từng redirect để ngăn DNS rebinding.
-- Áp dụng timeout, response-size, CPU, memory, concurrency và redirect limits.
+- Code áp dụng timeout, response-size, concurrency và redirect limits qua
+  `HIDDEN_LINK_CHECKER_SCAN_*`. Hard CPU/RAM limit cho Chromium chưa được thực
+  hiện trong ứng dụng; deployment phải bổ sung process/container limits trước
+  khi tiêu chí tài nguyên này được xem là đáp ứng.
 - Không gửi cookie, authorization header hoặc application secret tới URL đầu vào.
 - Không log OAuth credential, raw query string nhạy cảm hoặc toàn bộ DOM nếu
   không cần thiết.
 
 ## 8. PostgreSQL persistence
 
-PostgreSQL là database production chính với các bảng tối thiểu `users` và
-`url_checks`. Dùng foreign key, transaction và migration có version.
+PostgreSQL là database production chính. Production bắt buộc cấu hình
+`HIDDEN_LINK_CHECKER_DATABASE_URL`; API không fallback sang in-memory history.
+Migration có version là `migrations/0001_initial_schema.sql` rồi
+`migrations/0002_auth_sessions.sql`. Hiện chưa có migration runner hoặc ledger
+tự động; release phải áp dụng hai file đúng thứ tự. Web module chỉ gọi API và
+không mở kết nối database.
 
 Index tối thiểu:
 

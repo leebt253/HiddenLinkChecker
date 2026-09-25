@@ -77,8 +77,9 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
   endpoint.
 - Transport phải kết nối tới IP thuộc tập DNS đã xác minh, không tự resolve
   hostname lần nữa tại bước TCP; xác minh lại và pin lại ở từng redirect.
-- Áp dụng timeout, giới hạn redirect, response size, CPU, RAM và số scan đồng
-  thời từ cấu hình tập trung.
+- Áp dụng timeout, giới hạn redirect, response size và số scan đồng thời từ
+  cấu hình tập trung. Hard CPU/RAM cap cho Chromium phải do process/container
+  runtime cung cấp; code hiện chưa triển khai các cap đó.
 - Không gửi cookie, authorization header hoặc application secret tới trang đích.
 - Không log password, secret hoặc query string nhạy cảm. Lỗi network, timeout,
   403 và 429 phải được chuyển thành lỗi có kiểm soát, không làm API crash.
@@ -92,9 +93,10 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
   mở, điều hướng tới hoặc lưu trữ lại link đã phát hiện sau khi phản hồi.
 - Mọi kết quả đều là hidden link; phân biệt link hiển thị trực tiếp và không
   trực tiếp bằng `visibility = direct` hoặc `visibility = indirect`.
-- Khi không thể đọc đầy đủ nội dung do JavaScript, iframe, CAPTCHA, login,
-  timeout hoặc resource limit, trả về `partial` và limitation trong response
-  thay vì đoán.
+- Khi còn kết quả usable nhưng một phần nội dung không đọc được do JavaScript,
+  iframe, CAPTCHA, login hoặc giới hạn tài nguyên, trả `partial` kèm limitation.
+  Nếu không tạo được kết quả usable (ví dụ timeout trước khi đọc trang), trả
+  `failed` kèm limitation an toàn.
 
 ## 7. Bảo mật dữ liệu và ownership
 

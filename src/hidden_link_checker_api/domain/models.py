@@ -1,7 +1,7 @@
 """Domain entities owned by the API module."""
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
 
@@ -72,11 +72,6 @@ class UserSession:
         """Build a persistable session without retaining its plaintext token."""
         return cls(token_hash=_hash_secret(token), user_id=user_id, expires_at=expires_at)
 
-    @classmethod
-    def lifetime(cls, days: int) -> timedelta:
-        """Return the configured server-side session lifetime."""
-        return timedelta(days=days)
-
 
 @dataclass(frozen=True, slots=True)
 class OAuthLoginTransaction:
@@ -136,7 +131,6 @@ class LinkCheck:
     dom_excerpt: str | None = None
     limitations: list[str] = field(default_factory=list)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    completed_at: datetime | None = None
     links: list[LinkResult] = field(default_factory=list)
 
 

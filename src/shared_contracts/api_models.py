@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from shared_contracts.limits import MAX_INPUT_URL_CHARACTERS
+
 LinkCheckStatus = Literal["completed", "partial", "failed"]
 ElementType = Literal["text", "image", "background"]
 Visibility = Literal["direct", "indirect"]
@@ -14,7 +16,7 @@ Visibility = Literal["direct", "indirect"]
 class CreateLinkCheckRequest(BaseModel):
     """Payload for synchronously inspecting one page."""
 
-    url: str = Field(min_length=1, max_length=8192)
+    url: str = Field(min_length=1, max_length=MAX_INPUT_URL_CHARACTERS)
 
 
 class LinkResultResponse(BaseModel):

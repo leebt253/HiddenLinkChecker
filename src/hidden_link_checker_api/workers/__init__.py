@@ -1,1 +1,1 @@
-"""Asynchronous processing ports and workers."""
+"""Synchronous URL inspection worker components."""

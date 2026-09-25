@@ -1,6 +1,9 @@
+import socket
+import ssl
 from uuid import uuid4
 
 import httpx
+import pytest
 
 from hidden_link_checker_api.domain.models import LinkCheck, LinkCheckStatus
 from hidden_link_checker_api.workers.link_check_worker import LinkCheckWorker
@@ -146,7 +149,7 @@ def test_worker_rejects_response_larger_than_configured_limit(monkeypatch):
     worker.process(link_check)
 
     assert link_check.status is LinkCheckStatus.FAILED
-    assert link_check.error_code == "fetch_failed"
+    assert link_check.error_code == "resource_limit_exceeded"
     assert any("size limit" in item for item in link_check.limitations)
     assert link_check.links == []
 
@@ -176,3 +179,106 @@ def test_worker_returns_controlled_network_error_without_forwarding_credentials(
     assert sent_headers
     assert "cookie" not in sent_headers[0]
     assert "authorization" not in sent_headers[0]
+
+
+@pytest.mark.parametrize(
+    ("status_code", "error_code", "limitation"),
+    [
+        (403, "http_403", "denied access"),
+        (429, "http_429", "rate limited"),
+    ],
+)
+def test_worker_returns_controlled_http_access_errors(
+    monkeypatch, status_code: int, error_code: str, limitation: str
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code, text="secret=response-body", request=request)
+
+    monkeypatch.setattr(
+        "hidden_link_checker_api.workers.link_check_worker.ensure_safe_navigation_url",
+        lambda url: url,
+    )
+    link_check = LinkCheck(
+        user_id=uuid4(),
+        submitted_url="https://example.test/private?token=secret",
+        normalized_url="https://example.test/private?token=secret",
+    )
+
+    LinkCheckWorker(transport=httpx.MockTransport(handler)).process(link_check)
+
+    assert link_check.status is LinkCheckStatus.FAILED
+    assert link_check.error_code == error_code
+    assert any(limitation in item for item in link_check.limitations)
+    assert "secret" not in " ".join(link_check.limitations)
+    assert link_check.links == []
+
+
+def test_worker_maps_dns_failure_without_exposing_resolver_details(monkeypatch) -> None:
+    def fail_dns(*_args, **_kwargs):
+        raise socket.gaierror("resolver detail secret")
+
+    monkeypatch.setattr("hidden_link_checker_api.scanner.ssrf.socket.getaddrinfo", fail_dns)
+    link_check = LinkCheck(
+        user_id=uuid4(),
+        submitted_url="https://unresolved.example/?token=secret",
+        normalized_url="https://unresolved.example/?token=secret",
+    )
+
+    LinkCheckWorker().process(link_check)
+
+    assert link_check.status is LinkCheckStatus.FAILED
+    assert link_check.error_code == "dns_resolution_failed"
+    assert link_check.limitations == ["The URL host could not be resolved by DNS."]
+
+
+def test_worker_maps_tls_error_without_exposing_exception_details(monkeypatch) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        error = httpx.ConnectError("certificate detail secret", request=request)
+        error.__cause__ = ssl.SSLError("private key secret")
+        raise error
+
+    monkeypatch.setattr(
+        "hidden_link_checker_api.workers.link_check_worker.ensure_safe_navigation_url",
+        lambda url: url,
+    )
+    link_check = LinkCheck(
+        user_id=uuid4(),
+        submitted_url="https://example.test/?token=secret",
+        normalized_url="https://example.test/?token=secret",
+    )
+
+    LinkCheckWorker(transport=httpx.MockTransport(handler)).process(link_check)
+
+    assert link_check.status is LinkCheckStatus.FAILED
+    assert link_check.error_code == "tls_error"
+    assert link_check.limitations == [
+        "A secure TLS connection to the input page could not be established."
+    ]
+
+
+def test_worker_converts_parser_crash_to_safe_failed_result(monkeypatch) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text="<html>ok</html>", request=request)
+
+    def fail_parser(*_args, **_kwargs):
+        raise RuntimeError("parser secret detail")
+
+    monkeypatch.setattr(
+        "hidden_link_checker_api.workers.link_check_worker.ensure_safe_navigation_url",
+        lambda url: url,
+    )
+    monkeypatch.setattr(
+        "hidden_link_checker_api.workers.link_check_worker.extract_findings", fail_parser
+    )
+    link_check = LinkCheck(
+        user_id=uuid4(),
+        submitted_url="https://example.test/",
+        normalized_url="https://example.test/",
+    )
+
+    LinkCheckWorker(transport=httpx.MockTransport(handler)).process(link_check)
+
+    assert link_check.status is LinkCheckStatus.FAILED
+    assert link_check.error_code == "processing_failed"
+    assert link_check.limitations == ["The input URL could not be processed."]
+    assert "secret" not in " ".join(link_check.limitations)

@@ -74,6 +74,7 @@ a { color: inherit; }
 .welcome-panel { max-width: 620px; margin: 12vh auto; text-align: center; }
 .welcome-panel .primary-button { width: auto; padding-left: 32px; padding-right: 32px; }
 .result-table { width: 100%; margin-top: 22px; border-collapse: collapse; font: 13px Arial, sans-serif; }
+.result-filter + .result-filter { margin-left: 20px; }
 .results-scroll { max-width: 100%; max-height: 520px; margin-top: 22px; overflow: auto; padding: 4px; border: 1px solid var(--line); }
 .results-scroll .result-table { margin-top: 0; min-width: 760px; }
 .result-table th, .result-table td { padding: 12px 10px; border-bottom: 1px solid var(--line); text-align: left; }
@@ -253,8 +254,8 @@ def render_link_check(link_check: LinkCheckResponse) -> str:
         else ""
     )
     results_table = (
-        '<label>Visibility <select id="visibility-filter"><option value="all">All</option><option value="direct">Direct</option><option value="indirect">Indirect</option></select></label>'
-        '<label>Type <select id="type-filter"><option value="all">All</option><option value="text">Text</option><option value="image">Image</option><option value="background">Background</option></select></label>'
+        '<label class="result-filter">Visibility <select id="visibility-filter"><option value="all">All</option><option value="direct">Direct</option><option value="indirect">Indirect</option></select></label>'
+        '<label class="result-filter">Type <select id="type-filter"><option value="all">All</option><option value="text">Text</option><option value="image">Image</option><option value="background">Background</option></select></label>'
         '<div class="results-scroll"><table class="result-table"><thead><tr><th>Element type</th><th>Visibility</th><th>Object reference</th><th>Source URL</th><th>Actual URL</th><th>Visible text</th><th>Alt text</th><th>Position</th></tr></thead>'
         f'<tbody>{rows}</tbody></table></div>'
         '<nav class="pagination" id="results-pagination" aria-label="Inspection result pages">'
