@@ -236,15 +236,15 @@ CREATE INDEX user_sessions_active_idx
 
 ## 10. Thứ tự triển khai migration
 
-1. Bật extension `pgcrypto`.
-2. Tạo enum `user_status`.
-3. Tạo `users`.
-4. Tạo `url_checks`.
-5. Tạo foreign key, index và trigger.
-6. Chạy migration kiểm tra constraint và ownership query.
-7. Nếu dùng server-side session, tạo `user_sessions` và
-   `oauth_login_transactions`.
-8. Tạo migration seed/config cho môi trường development, không seed user thật.
+1. Chạy `migrations/0001_initial_schema.sql` (hoặc wrapper psql
+   `scripts/initial_schema.sql`) để tạo extension, enum `user_status`, bảng
+   `users`, bảng lịch sử tối giản `url_checks`, foreign key, index và trigger.
+2. Chạy `migrations/0002_auth_sessions.sql` để tạo
+   `user_sessions` và `oauth_login_transactions`; migration này phụ thuộc vào
+   `users` từ bước 1.
+3. Chạy `scripts/verify_schema.sql` và integration test để xác minh schema cùng
+   ownership query.
+4. Tạo migration seed/config riêng cho development; không seed user thật.
 
 Mỗi migration cần có version, checksum và được chạy trong CI/staging trước khi
 áp dụng production.

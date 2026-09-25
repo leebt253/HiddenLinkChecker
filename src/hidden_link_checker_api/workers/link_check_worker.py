@@ -5,13 +5,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from threading import BoundedSemaphore
 from time import monotonic
-from urllib.parse import urljoin
 
 import httpx
 
 from hidden_link_checker_api.domain.models import LinkCheck, LinkCheckStatus
 from hidden_link_checker_api.scanner.browser_renderer import BrowserPageRenderer
 from hidden_link_checker_api.scanner.extractor import extract_findings
+from hidden_link_checker_api.scanner.fetcher import BoundedUrlFetcher, LinkCheckFetchError
 from hidden_link_checker_api.scanner.ssrf import (
     UnsafeNavigationUrlError,
     ensure_safe_navigation_url,
@@ -19,10 +19,6 @@ from hidden_link_checker_api.scanner.ssrf import (
 from hidden_link_checker_api.scanner.urls import InvalidInputUrlError
 
 MAX_DOM_EXCERPT_CHARACTERS = 12_000
-
-
-class LinkCheckFetchError(RuntimeError):
-    """Raised when the submitted page cannot produce a usable document."""
 
 
 class LinkCheckWorker:
@@ -38,12 +34,16 @@ class LinkCheckWorker:
         max_concurrent: int = 4,
         renderer: BrowserPageRenderer | None = None,
     ) -> None:
-        self._transport = transport
         self._timeout = timeout_seconds
-        self._max_redirects = max_redirects
         self._max_response_bytes = max_response_bytes
         self._slots = BoundedSemaphore(max_concurrent)
         self._renderer = renderer or BrowserPageRenderer(timeout_seconds=timeout_seconds)
+        self._fetcher = BoundedUrlFetcher(
+            transport=transport,
+            max_redirects=max_redirects,
+            max_response_bytes=max_response_bytes,
+            safe_url_validator=ensure_safe_navigation_url,
+        )
 
     def process(self, link_check: LinkCheck) -> None:
         """Fetch only the submitted page and attach findings to this request object."""
@@ -55,24 +55,24 @@ class LinkCheckWorker:
             link_check.completed_at = datetime.now(UTC)
             return
         try:
-            html, final_url, http_status, limitations = self._fetch_document(
-                link_check.normalized_url, deadline
-            )
+            fetched = self._fetcher.fetch(link_check.normalized_url, deadline)
             remaining_seconds = deadline - monotonic()
             if remaining_seconds <= 0:
                 raise httpx.TimeoutException("The URL check exceeded its configured timeout.")
-            rendered = self._renderer.render(html, final_url, timeout_seconds=remaining_seconds)
+            rendered = self._renderer.render(
+                fetched.html, fetched.final_url, timeout_seconds=remaining_seconds
+            )
             html = rendered.html
-            limitations.extend(rendered.limitations)
+            limitations = fetched.limitations + list(rendered.limitations)
             rendered_size = len(html.encode("utf-8"))
             if rendered_size > self._max_response_bytes:
                 html = html.encode("utf-8")[: self._max_response_bytes].decode(
                     "utf-8", errors="ignore"
                 )
                 limitations.append("The rendered DOM exceeded the configured size limit and was truncated.")
-            link_check.final_url = final_url
-            link_check.http_status = http_status
-            link_check.links = extract_findings(html, final_url)
+            link_check.final_url = fetched.final_url
+            link_check.http_status = fetched.http_status
+            link_check.links = extract_findings(html, fetched.final_url)
             link_check.dom_excerpt = html[:MAX_DOM_EXCERPT_CHARACTERS]
             if len(html) > MAX_DOM_EXCERPT_CHARACTERS:
                 limitations.append("The displayed DOM excerpt was truncated.")
@@ -94,59 +94,6 @@ class LinkCheckWorker:
         finally:
             self._slots.release()
             link_check.completed_at = datetime.now(UTC)
-
-    def _fetch_document(
-        self, submitted_url: str, deadline: float
-    ) -> tuple[str, str, int, list[str]]:
-        current_url = ensure_safe_navigation_url(submitted_url)
-        limitations: list[str] = []
-        with httpx.Client(
-            follow_redirects=False,
-            timeout=self._timeout,
-            trust_env=False,
-            transport=self._transport,
-            headers={"User-Agent": "HiddenLinkChecker/0.1"},
-        ) as client:
-            for redirect_count in range(self._max_redirects + 1):
-                remaining_seconds = deadline - monotonic()
-                if remaining_seconds <= 0:
-                    raise httpx.TimeoutException("The URL check exceeded its configured timeout.")
-                with client.stream("GET", current_url, timeout=remaining_seconds) as response:
-                    if 300 <= response.status_code < 400:
-                        location = response.headers.get("location")
-                        if not location:
-                            raise LinkCheckFetchError("The input URL returned a redirect without a location.")
-                        if redirect_count == self._max_redirects:
-                            raise LinkCheckFetchError("The input URL exceeded the redirect limit.")
-                        current_url = ensure_safe_navigation_url(urljoin(current_url, location))
-                        continue
-                    if response.status_code >= 400:
-                        raise httpx.HTTPStatusError(
-                            f"The input URL returned HTTP {response.status_code}.",
-                            request=response.request,
-                            response=response,
-                        )
-                    content = self._read_limited_body(response)
-                    content_type = response.headers.get("content-type", "")
-                    if content_type and "html" not in content_type.lower():
-                        limitations.append("The response content type is not HTML.")
-                    return (
-                        content.decode(response.encoding or "utf-8", errors="replace"),
-                        current_url,
-                        response.status_code,
-                        limitations,
-                    )
-        raise LinkCheckFetchError("The input URL could not be fetched.")
-
-    def _read_limited_body(self, response: httpx.Response) -> bytes:
-        chunks: list[bytes] = []
-        total_bytes = 0
-        for chunk in response.iter_bytes():
-            total_bytes += len(chunk)
-            if total_bytes > self._max_response_bytes:
-                raise LinkCheckFetchError("The response exceeded the configured size limit.")
-            chunks.append(chunk)
-        return b"".join(chunks)
 
 
 def _error_code(error: Exception) -> str:

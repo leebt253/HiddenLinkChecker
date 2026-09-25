@@ -72,3 +72,107 @@ def test_worker_returns_controlled_failed_result_on_fetch_error(monkeypatch):
     assert link_check.error_code == "http_503"
     assert link_check.links == []
     assert link_check.limitations
+
+
+def test_worker_rejects_redirect_to_private_ip_before_requesting_it(monkeypatch):
+    from ipaddress import ip_address
+
+    from hidden_link_checker_api.scanner import ssrf
+
+    requested_urls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_urls.append(str(request.url))
+        return httpx.Response(
+            302,
+            headers={"location": "http://127.0.0.1/private"},
+            request=request,
+        )
+
+    monkeypatch.setattr(ssrf, "_resolve_addresses", lambda _: {ip_address("93.184.216.34")})
+    worker = LinkCheckWorker(transport=httpx.MockTransport(handler))
+    link_check = LinkCheck(
+        user_id=uuid4(),
+        submitted_url="https://example.test/start",
+        normalized_url="https://example.test/start",
+    )
+
+    worker.process(link_check)
+
+    assert link_check.status is LinkCheckStatus.FAILED
+    assert link_check.error_code == "unsafe_navigation_url"
+    assert requested_urls == ["https://example.test/start"]
+
+
+def test_worker_returns_controlled_timeout_result(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("read timed out", request=request)
+
+    monkeypatch.setattr(
+        "hidden_link_checker_api.workers.link_check_worker.ensure_safe_navigation_url",
+        lambda url: url,
+    )
+    worker = LinkCheckWorker(transport=httpx.MockTransport(handler))
+    link_check = LinkCheck(
+        user_id=uuid4(),
+        submitted_url="https://example.test/slow",
+        normalized_url="https://example.test/slow",
+    )
+
+    worker.process(link_check)
+
+    assert link_check.status is LinkCheckStatus.FAILED
+    assert link_check.error_code == "timeout"
+    assert link_check.links == []
+
+
+def test_worker_rejects_response_larger_than_configured_limit(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text="123456789", request=request)
+
+    monkeypatch.setattr(
+        "hidden_link_checker_api.workers.link_check_worker.ensure_safe_navigation_url",
+        lambda url: url,
+    )
+    worker = LinkCheckWorker(
+        transport=httpx.MockTransport(handler), max_response_bytes=8
+    )
+    link_check = LinkCheck(
+        user_id=uuid4(),
+        submitted_url="https://example.test/large",
+        normalized_url="https://example.test/large",
+    )
+
+    worker.process(link_check)
+
+    assert link_check.status is LinkCheckStatus.FAILED
+    assert link_check.error_code == "fetch_failed"
+    assert any("size limit" in item for item in link_check.limitations)
+    assert link_check.links == []
+
+
+def test_worker_returns_controlled_network_error_without_forwarding_credentials(monkeypatch):
+    sent_headers: list[httpx.Headers] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent_headers.append(request.headers)
+        raise httpx.ConnectError("connection refused", request=request)
+
+    monkeypatch.setattr(
+        "hidden_link_checker_api.workers.link_check_worker.ensure_safe_navigation_url",
+        lambda url: url,
+    )
+    worker = LinkCheckWorker(transport=httpx.MockTransport(handler))
+    link_check = LinkCheck(
+        user_id=uuid4(),
+        submitted_url="https://example.test/offline",
+        normalized_url="https://example.test/offline",
+    )
+
+    worker.process(link_check)
+
+    assert link_check.status is LinkCheckStatus.FAILED
+    assert link_check.error_code == "fetch_failed"
+    assert sent_headers
+    assert "cookie" not in sent_headers[0]
+    assert "authorization" not in sent_headers[0]

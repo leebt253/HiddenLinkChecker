@@ -75,6 +75,8 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
 - Kiểm tra SSRF trước khi worker truy cập URL và kiểm tra lại sau mỗi redirect.
   Chặn localhost, loopback, private, link-local, multicast và cloud metadata
   endpoint.
+- Transport phải kết nối tới IP thuộc tập DNS đã xác minh, không tự resolve
+  hostname lần nữa tại bước TCP; xác minh lại và pin lại ở từng redirect.
 - Áp dụng timeout, giới hạn redirect, response size, CPU, RAM và số scan đồng
   thời từ cấu hình tập trung.
 - Không gửi cookie, authorization header hoặc application secret tới trang đích.

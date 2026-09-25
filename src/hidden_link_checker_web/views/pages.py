@@ -78,6 +78,12 @@ a { color: inherit; }
 .results-scroll .result-table { margin-top: 0; min-width: 760px; }
 .result-table th, .result-table td { padding: 12px 10px; border-bottom: 1px solid var(--line); text-align: left; }
 .result-table th { color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.result-status { margin: 18px 0; padding: 14px 16px; border-left: 4px solid var(--teal); background: #e4f0ec; font: 14px/1.5 Arial, sans-serif; }
+.result-status strong { display: block; margin-bottom: 3px; color: var(--teal-dark); }
+.result-status-partial { border-color: #bd7c18; background: #fff2d7; }
+.result-status-partial strong { color: #825000; }
+.result-status-failed { border-color: #b23d35; background: #fbe7e3; }
+.result-status-failed strong { color: #8b2822; }
 .dom-context { margin-top: 20px; font: 14px Arial, sans-serif; }
 .dom-context pre { max-height: 360px; overflow: auto; padding: 14px; background: #eef1ed; white-space: pre-wrap; overflow-wrap: anywhere; }
 .pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; font: 13px Arial, sans-serif; }
@@ -205,15 +211,40 @@ def render_link_check(link_check: LinkCheckResponse) -> str:
         f"<td>{escape(link.actual_url)}</td>"
         f"<td>{escape(link.visible_text or '')}</td>"
         f"<td>{escape(link.alt_text or '')}</td>"
+        f"<td>{escape(_format_position(link.position))}</td>"
         "</tr>"
         for link in link_check.links
     )
     total_records = len(link_check.links)
+    status_copy = {
+        "completed": ("Inspection completed", "The page was inspected successfully."),
+        "partial": (
+            "Partial result",
+            "The page could not be fully inspected. Review the limitations and treat these findings as incomplete.",
+        ),
+        "failed": (
+            "Inspection failed",
+            "The page could not be inspected. No link findings are available for this request.",
+        ),
+    }
+    status_title, status_message = status_copy[link_check.status]
+    status_detail = (
+        f'<span> Error code: {escape(link_check.error_code)}</span>' if link_check.error_code else ""
+    )
+    status_block = (
+        f'<div class="result-status result-status-{escape(link_check.status)}" role="status">'
+        f'<strong>{status_title}</strong>{status_message}{status_detail}</div>'
+    )
     links_summary = (
         f'<p class="muted" id="findings-total" data-total="{total_records}">'
         f'{total_records} hidden link(s) found in this URL.</p>'
-        if link_check.links
-        else '<p class="muted">No hidden links found in the readable page content.</p>'
+        if link_check.links or link_check.status != "failed"
+        else ""
+    )
+    no_findings_message = (
+        '<p class="muted">No hidden links were found in the processed page content.</p>'
+        if not link_check.links and link_check.status != "failed"
+        else ""
     )
     limitations = "".join(f"<li>{escape(item)}</li>" for item in link_check.limitations)
     limitations_block = (
@@ -224,7 +255,7 @@ def render_link_check(link_check: LinkCheckResponse) -> str:
     results_table = (
         '<label>Visibility <select id="visibility-filter"><option value="all">All</option><option value="direct">Direct</option><option value="indirect">Indirect</option></select></label>'
         '<label>Type <select id="type-filter"><option value="all">All</option><option value="text">Text</option><option value="image">Image</option><option value="background">Background</option></select></label>'
-        '<div class="results-scroll"><table class="result-table"><thead><tr><th>Type</th><th>Visibility</th><th>Object</th><th>Source</th><th>Actual URL</th><th>Visible text</th><th>Alt text</th></tr></thead>'
+        '<div class="results-scroll"><table class="result-table"><thead><tr><th>Element type</th><th>Visibility</th><th>Object reference</th><th>Source URL</th><th>Actual URL</th><th>Visible text</th><th>Alt text</th><th>Position</th></tr></thead>'
         f'<tbody>{rows}</tbody></table></div>'
         '<nav class="pagination" id="results-pagination" aria-label="Inspection result pages">'
         '<button type="button" id="results-previous">Previous</button>'
@@ -281,8 +312,18 @@ filterFindings();
         f'<span class="eyebrow">Inspection / {escape(link_check.status)}</span>'
         f'<h1 class="inspection-title">Inspection result</h1>'
         f'<label class="inspection-url">Submitted URL<input type="text" value="{escape(link_check.submitted_url, quote=True)}" readonly></label>'
+        f'{status_block}'
         f'<p class="muted">Checked at {escape(link_check.checked_at.isoformat())}</p>'
-        f'{links_summary}{limitations_block}{dom_context}{results_table}<a class="back-link" href="/">Back to dashboard</a>'
+        f'{links_summary}{no_findings_message}{limitations_block}{dom_context}{results_table}<a class="back-link" href="/">Back to dashboard</a>'
         '</section></main></div>'
     )
     return _document("Inspection - Hidden Link Checker", body, filter_script)
+
+
+def _format_position(position: dict[str, float] | None) -> str:
+    """Render only the explicitly allowed numeric DOM position fields."""
+    if not position:
+        return ""
+    return ", ".join(
+        f"{escape(axis)}: {escape(format(value, 'g'))}" for axis, value in position.items()
+    )

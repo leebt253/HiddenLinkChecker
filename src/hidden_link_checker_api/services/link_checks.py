@@ -10,7 +10,7 @@ from hidden_link_checker_api.domain.models import (
     LinkCheckStatus,
     UrlCheckHistory,
 )
-from hidden_link_checker_api.repositories.link_checks import UrlCheckHistoryRepository
+from hidden_link_checker_api.repositories.link_checks import UrlCheckRepository
 from hidden_link_checker_api.scanner.urls import InvalidInputUrlError, normalize_input_url
 
 
@@ -24,7 +24,7 @@ class LinkCheckService:
     """Run one scan, return ephemeral findings, and persist URL history only."""
 
     def __init__(
-        self, repository: UrlCheckHistoryRepository, processor: LinkCheckProcessor
+        self, repository: UrlCheckRepository, processor: LinkCheckProcessor
     ) -> None:
         self._repository = repository
         self._processor = processor

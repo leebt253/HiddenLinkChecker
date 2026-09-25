@@ -14,9 +14,9 @@ from hidden_link_checker_api.repositories.auth import (
     PostgreSQLAuthRepository,
 )
 from hidden_link_checker_api.repositories.link_checks import (
-    InMemoryUrlCheckHistoryRepository,
-    PostgreSQLUrlCheckHistoryRepository,
-    UrlCheckHistoryRepository,
+    InMemoryUrlCheckRepository,
+    PostgreSQLUrlCheckRepository,
+    UrlCheckRepository,
 )
 from hidden_link_checker_api.scanner.browser_renderer import BrowserPageRenderer
 from hidden_link_checker_api.services.auth import (
@@ -31,7 +31,7 @@ from hidden_link_checker_api.workers.link_check_worker import LinkCheckWorker
 def create_app(
     settings: ApiSettings | None = None,
     auth_repository: AuthRepository | None = None,
-    link_check_repository: UrlCheckHistoryRepository | None = None,
+    link_check_repository: UrlCheckRepository | None = None,
     link_check_transport: httpx.BaseTransport | None = None,
 ) -> FastAPI:
     """Create the API application with replaceable infrastructure adapters."""
@@ -39,10 +39,8 @@ def create_app(
     app = FastAPI(title="Hidden Link Checker API", version="0.1.0")
     app.state.settings = resolved_settings
     app.state.authentication_service = _build_authentication_service(resolved_settings, auth_repository)
-    resolved_link_check_repository = link_check_repository or (
-        PostgreSQLUrlCheckHistoryRepository(resolved_settings.database_url)
-        if resolved_settings.database_url
-        else InMemoryUrlCheckHistoryRepository()
+    resolved_link_check_repository = _build_link_check_repository(
+        resolved_settings, link_check_repository
     )
     link_check_worker = LinkCheckWorker(
         transport=link_check_transport,
@@ -62,6 +60,20 @@ def create_app(
     app.include_router(auth_router)
     app.include_router(link_checks_router)
     return app
+
+
+def _build_link_check_repository(
+    settings: ApiSettings, repository: UrlCheckRepository | None
+) -> UrlCheckRepository:
+    if repository is not None:
+        if isinstance(repository, InMemoryUrlCheckRepository) and settings.environment == "production":
+            raise RuntimeError("In-memory URL history is only available in development or test.")
+        return repository
+    if settings.database_url:
+        return PostgreSQLUrlCheckRepository(settings.database_url)
+    if settings.environment in {"development", "test"}:
+        return InMemoryUrlCheckRepository()
+    raise RuntimeError("HIDDEN_LINK_CHECKER_DATABASE_URL is required in production.")
 
 
 def _build_authentication_service(

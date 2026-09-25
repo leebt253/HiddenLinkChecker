@@ -106,6 +106,8 @@ verdict.
 ## 7. URL và dữ liệu nhạy cảm
 
 - Chặn localhost, loopback, private IP, link-local, multicast và cloud metadata.
+- Chặn địa chỉ reserved/non-global; pin kết nối TCP vào IP đã xác minh, giữ
+  hostname cho TLS và xác minh/pin lại sau từng redirect để ngăn DNS rebinding.
 - Áp dụng timeout, response-size, CPU, memory, concurrency và redirect limits.
 - Không gửi cookie, authorization header hoặc application secret tới URL đầu vào.
 - Không log OAuth credential, raw query string nhạy cảm hoặc toàn bộ DOM nếu

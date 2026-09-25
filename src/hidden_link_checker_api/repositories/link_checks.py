@@ -11,7 +11,7 @@ from psycopg.rows import dict_row
 from hidden_link_checker_api.domain.models import UrlCheckHistory
 
 
-class UrlCheckHistoryRepository(Protocol):
+class UrlCheckRepository(Protocol):
     """Persistence port for URL and timestamp only."""
 
     def add(self, item: UrlCheckHistory) -> None:
@@ -24,7 +24,7 @@ class UrlCheckHistoryRepository(Protocol):
         """Delete one history record only when it belongs to the user."""
 
 
-class InMemoryUrlCheckHistoryRepository:
+class InMemoryUrlCheckRepository:
     """Test and prototype adapter that stores only minimal history fields."""
 
     def __init__(self) -> None:
@@ -48,7 +48,7 @@ class InMemoryUrlCheckHistoryRepository:
         return True
 
 
-class PostgreSQLUrlCheckHistoryRepository:
+class PostgreSQLUrlCheckRepository:
     """PostgreSQL adapter that never receives or persists scan results."""
 
     def __init__(self, database_url: str) -> None:
@@ -91,3 +91,9 @@ def _to_history(row: dict[str, object]) -> UrlCheckHistory:
     return UrlCheckHistory(
         id=row["id"], user_id=row["user_id"], url=row["url"], checked_at=row["checked_at"]
     )
+
+
+# Backwards-compatible names retained for callers that refer to history explicitly.
+UrlCheckHistoryRepository = UrlCheckRepository
+InMemoryUrlCheckHistoryRepository = InMemoryUrlCheckRepository
+PostgreSQLUrlCheckHistoryRepository = PostgreSQLUrlCheckRepository

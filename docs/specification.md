@@ -56,6 +56,8 @@ Trước và trong quá trình điều hướng, system phải:
 - Chỉ cho phép scheme `http` và `https`.
 - Chặn localhost, loopback, private IP, link-local, multicast và cloud metadata endpoint.
 - Resolve và kiểm tra IP sau mỗi redirect của **URL đầu vào**.
+- Pin TCP tới một IP đã xác minh cho từng request; từ chối reserved/non-global
+  IP và hostname metadata để ngăn DNS rebinding.
 - Giới hạn timeout, số redirect, response size, CPU, RAM và số scan đồng thời.
 - Không gửi cookie, authorization header hoặc application secret tới trang đích.
 - Không fetch, mở, redirect hoặc điều hướng tới bất kỳ hidden link nào được

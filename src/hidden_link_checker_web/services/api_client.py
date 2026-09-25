@@ -16,41 +16,52 @@ from shared_contracts.api_models import (
 class HiddenLinkCheckerApiClient:
     """Call the API without accessing persistence or domain internals."""
 
-    def __init__(self, settings: WebSettings) -> None:
+    def __init__(
+        self, settings: WebSettings, transport: httpx.AsyncBaseTransport | None = None
+    ) -> None:
         self._base_url = settings.api_base_url.rstrip("/")
+        self._transport = transport
+
+    def _client(self, cookies: Mapping[str, str]) -> httpx.AsyncClient:
+        """Create an API-only client and optionally inject a test transport."""
+        return httpx.AsyncClient(
+            base_url=self._base_url,
+            cookies=cookies,
+            transport=self._transport,
+        )
 
     async def create_link_check(
         self, url: str, cookies: Mapping[str, str]
     ) -> LinkCheckResponse:
         """Inspect one URL synchronously using the browser's API session cookie."""
-        async with httpx.AsyncClient(base_url=self._base_url, cookies=cookies) as client:
+        async with self._client(cookies) as client:
             response = await client.post("/v1/link-checks", json={"url": url})
         response.raise_for_status()
         return LinkCheckResponse.model_validate(response.json())
 
     async def list_link_checks(self, cookies: Mapping[str, str]) -> list[LinkCheckHistoryItem]:
         """Load history visible to the current user."""
-        async with httpx.AsyncClient(base_url=self._base_url, cookies=cookies) as client:
+        async with self._client(cookies) as client:
             response = await client.get("/v1/me/link-checks")
         response.raise_for_status()
         return [LinkCheckHistoryItem.model_validate(item) for item in response.json()]
 
     async def delete_link_check(self, check_id: UUID, cookies: Mapping[str, str]) -> None:
         """Delete one owned URL history item through the API."""
-        async with httpx.AsyncClient(base_url=self._base_url, cookies=cookies) as client:
+        async with self._client(cookies) as client:
             response = await client.delete(f"/v1/me/link-checks/{check_id}")
         response.raise_for_status()
 
     async def get_current_user(self, cookies: Mapping[str, str]) -> CurrentUserResponse:
         """Return the profile resolved by the API from the session cookie."""
-        async with httpx.AsyncClient(base_url=self._base_url, cookies=cookies) as client:
+        async with self._client(cookies) as client:
             response = await client.get("/v1/me")
         response.raise_for_status()
         return CurrentUserResponse.model_validate(response.json())
 
     async def logout(self, cookies: Mapping[str, str]) -> None:
         """Ask the API to revoke the server-side session."""
-        async with httpx.AsyncClient(base_url=self._base_url, cookies=cookies) as client:
+        async with self._client(cookies) as client:
             response = await client.post("/v1/auth/logout")
         response.raise_for_status()
 

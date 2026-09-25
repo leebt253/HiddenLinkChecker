@@ -1,5 +1,7 @@
 """Configuration for the API process."""
 
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +14,7 @@ class ApiSettings(BaseSettings):
         extra="ignore",
     )
 
+    environment: Literal["development", "test", "production"] = "production"
     api_host: str = "127.0.0.1"
     api_port: int = 8000
     database_url: str | None = None

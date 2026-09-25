@@ -107,9 +107,11 @@ python -m playwright install chromium
 Có thể đặt `HIDDEN_LINK_CHECKER_BROWSER_EXECUTABLE` để chỉ định executable trong
 môi trường triển khai.
 
-Google OAuth credentials và cấu hình PostgreSQL sẽ được cung cấp qua biến môi
-trường khi web application được triển khai. Sao chép `.env.example` thành
-`.env` và điền giá trị triển khai thực tế; không commit tệp `.env`.
+Sao chép `.env.example` thành `.env` để chạy local. Khi triển khai, đặt
+`HIDDEN_LINK_CHECKER_ENVIRONMENT=production` và cấu hình PostgreSQL cùng Google
+OAuth credentials; không commit tệp `.env`. Production sẽ từ chối khởi động nếu
+thiếu `HIDDEN_LINK_CHECKER_DATABASE_URL`. In-memory URL history chỉ dùng khi
+`HIDDEN_LINK_CHECKER_ENVIRONMENT` là `development` hoặc `test`.
 
 ### Cấu hình Google OAuth
 
@@ -125,9 +127,11 @@ trường khi web application được triển khai. Sao chép `.env.example` th
    dùng `psycopg` trực tiếp.
 4. Khi deploy HTTPS, đặt `HIDDEN_LINK_CHECKER_SESSION_COOKIE_SECURE=true`.
 
-Áp dụng schema nền tảng trước, rồi migration session/OIDC:
+Trong PowerShell, cung cấp URL cho lệnh `psql` (psql không đọc `.env`), rồi áp
+dụng schema nền tảng trước migration session/OIDC:
 
 ```powershell
+$env:HIDDEN_LINK_CHECKER_DATABASE_URL = "postgresql://user:password@localhost:5432/hidden_link_checker"
 psql $env:HIDDEN_LINK_CHECKER_DATABASE_URL -v ON_ERROR_STOP=1 -f scripts/initial_schema.sql
 psql $env:HIDDEN_LINK_CHECKER_DATABASE_URL -v ON_ERROR_STOP=1 -f migrations/0002_auth_sessions.sql
 ```
@@ -142,40 +146,13 @@ python -m pytest -q
 
 ### Chạy hai module độc lập
 
-Khởi tạo PostgreSQL và chạy API trên Windows:
-
-```cmd
-set HIDDEN_LINK_CHECKER_DATABASE_URL=postgresql://user:password@localhost:5432/hidden_link_checker
-scripts\start_api.cmd
-```
-
-`start_api.cmd` áp dụng `scripts/initial_schema.sql` và các migration chưa chạy
-trước khi mở API. Script sẽ dừng nếu thiếu `HIDDEN_LINK_CHECKER_DATABASE_URL`,
-để tránh chạy nhầm bằng persistence in-memory và mất dữ liệu sau khi restart.
-
-Mở terminal khác để chạy web server:
-
-```cmd
-scripts\start_server.cmd
-```
-
-Để thử Google OAuth local mà chưa có PostgreSQL, mở terminal chạy API với
-in-memory authentication:
-
-```powershell
-$env:HIDDEN_LINK_CHECKER_DATABASE_URL = ""
-.venv\Scripts\python.exe -m uvicorn hidden_link_checker_api.main:app --host 127.0.0.1 --port 8000
-```
-
-Trong terminal khác, chạy Web module:
-
-Khởi động API trước:
+Sau khi áp dụng migration theo hướng dẫn ở phần cấu hình, trong terminal thứ nhất chạy API:
 
 ```bash
 python -m uvicorn hidden_link_checker_api.main:app --host 127.0.0.1 --port 8000
 ```
 
-Sau đó, trong terminal khác, khởi động Web module:
+Trong terminal thứ hai, khởi động Web module:
 
 ```bash
 python -m uvicorn hidden_link_checker_web.main:app --host 127.0.0.1 --port 8001
@@ -218,6 +195,8 @@ URL người dùng nhập là một ranh giới bảo mật quan trọng. Implem
 - Chỉ cho phép scheme `http` và `https`.
 - Chặn localhost, loopback, private IP, link-local, multicast và cloud metadata.
 - Kiểm tra DNS/IP trước khi truy cập và sau mỗi redirect của URL đầu vào.
+- Kết nối TCP được pin vào một IP công khai trong đúng tập IP đã xác minh để
+  tránh DNS rebinding; từ chối địa chỉ reserved và metadata.
 - Không fetch, mở hoặc điều hướng tới link được phát hiện trong DOM.
 - Áp dụng timeout, giới hạn response size, CPU, memory, concurrency và redirect.
 - Không gửi cookie, authorization header hoặc application secret tới URL đầu vào.

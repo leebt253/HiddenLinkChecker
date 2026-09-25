@@ -2,6 +2,7 @@
 
 import ipaddress
 import socket
+from typing import Self
 from urllib.parse import urlsplit
 
 from hidden_link_checker_api.scanner.urls import InvalidInputUrlError, normalize_input_url
@@ -13,8 +14,23 @@ class UnsafeNavigationUrlError(ValueError):
     """Raised when a navigation target resolves to a prohibited address."""
 
 
-def ensure_safe_navigation_url(candidate_url: str) -> str:
-    """Validate an input or redirect URL before a worker connects to it."""
+class SafeNavigationURL(str):
+    """Normalized URL carrying the exact safe DNS answers to pin at connect time."""
+
+    def __new__(
+        cls,
+        normalized_url: str,
+        hostname: str,
+        addresses: frozenset[ipaddress.IPv4Address | ipaddress.IPv6Address],
+    ) -> Self:
+        instance = super().__new__(cls, normalized_url)
+        instance.hostname = hostname
+        instance.addresses = addresses
+        return instance
+
+
+def ensure_safe_navigation_url(candidate_url: str) -> SafeNavigationURL:
+    """Validate a URL and retain its verified addresses for a pinned connection."""
     normalized_url = normalize_input_url(candidate_url)
     hostname = urlsplit(normalized_url).hostname
     if hostname is None:
@@ -22,10 +38,13 @@ def ensure_safe_navigation_url(candidate_url: str) -> str:
     if hostname.lower() in METADATA_HOSTS or hostname.lower().endswith(".metadata.google.internal"):
         raise UnsafeNavigationUrlError("Cloud metadata endpoints are not allowed.")
 
-    addresses = _resolve_addresses(hostname)
+    try:
+        addresses = frozenset({ipaddress.ip_address(hostname)})
+    except ValueError:
+        addresses = frozenset(_resolve_addresses(hostname))
     if any(_is_prohibited_address(address) for address in addresses):
         raise UnsafeNavigationUrlError("The URL resolves to a prohibited network address.")
-    return normalized_url
+    return SafeNavigationURL(normalized_url, hostname, addresses)
 
 
 def _resolve_addresses(hostname: str) -> set[ipaddress.IPv4Address | ipaddress.IPv6Address]:
@@ -41,6 +60,9 @@ def _resolve_addresses(hostname: str) -> set[ipaddress.IPv4Address | ipaddress.I
 
 
 def _is_prohibited_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    mapped_address = address.ipv4_mapped if isinstance(address, ipaddress.IPv6Address) else None
+    if mapped_address is not None and _is_prohibited_address(mapped_address):
+        return True
     return any(
         (
             address.is_private,
@@ -49,5 +71,6 @@ def _is_prohibited_address(address: ipaddress.IPv4Address | ipaddress.IPv6Addres
             address.is_multicast,
             address.is_unspecified,
             address.is_reserved,
+            not address.is_global,
         )
     )
