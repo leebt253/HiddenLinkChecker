@@ -11,18 +11,19 @@
 ## 2. Product objective
 
 Cho phép người dùng đăng nhập bằng Google, gửi một URL qua API, lấy DOM trong
-worker cô lập, phát hiện hidden link từ text/image/background và trả kết quả
-trong thời gian xử lý. Database chỉ lưu URL và thời điểm check; không lưu DOM
-hoặc hidden-link results. System không tự động mở hoặc request tới hidden link.
+browser worker cô lập, phát hiện các hidden link từ text/image/background và
+trả toàn bộ kết quả **đồng bộ** trong response của cùng request. System không
+tự động mở hoặc request tới hidden link được phát hiện, và không lưu lại chi
+tiết hidden link sau khi đã phản hồi — chỉ lưu lịch sử URL đã kiểm tra.
 
 ## 3. Actors
 
 | Actor | Quyền và trách nhiệm |
 |---|---|
 | Unauthenticated user | Đăng nhập bằng Google |
-| Authenticated user | Tạo, xem và xóa lịch sử URL của mình |
-| Link processor | Fetch/render URL đầu vào trong sandbox, lấy DOM và parse hidden link |
-| System administrator | Quản lý giới hạn vận hành và retention nếu cần |
+| Authenticated user | Gửi URL để kiểm tra, xem và xóa lịch sử URL của mình |
+| Link processor | Fetch/render URL đầu vào trong sandbox, lấy DOM và parse hidden link trong cùng request |
+| System administrator | Quản lý giới hạn vận hành và retention của lịch sử URL nếu cần |
 
 ## 4. Functional requirements
 
@@ -33,20 +34,20 @@ Google OAuth/OIDC. User được định danh bằng provider subject ổn đị
 không nhận password của user và không lưu Google access token nếu không cần cho
 use case.
 
-### FR-002 Create link check
+### FR-002 Check a URL
 
-Authenticated user có thể tạo một lần kiểm tra bằng URL `http` hoặc `https`.
-Request tối thiểu:
+Authenticated user có thể kiểm tra một URL `http` hoặc `https`. Request tối thiểu:
 
 ```json
 {
-  "url": "https://example.com",
-  "include_dom": true
+  "url": "https://example.com"
 }
 ```
 
-System trả về link check ở trạng thái `queued` và không đồng bộ chờ processor
-hoàn tất.
+System xử lý đồng bộ: fetch/render URL, trích xuất hidden link và trả toàn bộ
+kết quả trong cùng response. Sau khi phản hồi, system lưu một bản ghi lịch sử
+tối giản (`url`, `checked_at`) cho user; hidden link phát hiện được không được
+lưu lại.
 
 ### FR-003 Secure input processing
 
@@ -79,12 +80,10 @@ chạy rule engine.
 URL tương đối phải được chuẩn hóa theo URL cuối cùng của trang. Mỗi link result
 phải giữ URL nguồn và URL thực tế.
 
-### FR-005 Link result contract (ephemeral)
+### FR-005 Link result contract
 
 ```json
 {
-  "id": "link_result_123",
-  "link_check_id": "check_123",
   "element_type": "text",
   "object_reference": "img_42",
   "source_url": "/offers/casino",
@@ -96,42 +95,41 @@ phải giữ URL nguồn và URL thực tế.
 }
 ```
 
-`position` có thể là `null` nếu element không render được hoặc không lấy được bounding box.
-Contract này chỉ phục vụ response/dashboard trong phiên xử lý; không có bảng
-database lưu `LinkResult`.
+`position` có thể là `null` nếu element không render được hoặc không lấy được
+bounding box. Contract này chỉ áp dụng cho response của request kiểm tra; không
+có `id` ổn định vì hidden link không được lưu trữ.
 
-### FR-006 Link check result and dashboard
+### FR-006 Kết quả kiểm tra và dashboard
 
-Dashboard của link check hoàn tất phải hiển thị:
+Sau khi gọi API thành công, dashboard phải hiển thị ngay:
 
-- Trạng thái xử lý và URL đầu vào.
-- DOM hoặc phần DOM được phép lưu.
-- Danh sách hidden link và visibility của từng kết quả.
+- URL đầu vào và trạng thái xử lý (thành công hay có giới hạn).
+- DOM hoặc phần DOM được phép hiển thị.
+- Danh sách hidden link và visibility của từng kết quả trong response đó.
 - Object/thuộc tính DOM, URL nguồn và actual URL của từng kết quả.
-- Bộ lọc theo `visibility`, element type hoặc domain nếu cần.
+- Bộ lọc theo `visibility` hoặc element type áp dụng trên kết quả đang hiển thị
+  của lần gọi hiện tại; dashboard không thể lọc lại một lần kiểm tra cũ vì
+  hidden link không được lưu trữ.
 
-### FR-007 Link check lifecycle
+### FR-007 Xử lý lỗi có kiểm soát
 
-Link check phải hỗ trợ các trạng thái:
-
-```text
-queued -> running -> completed
-                  -> partial
-                  -> failed
-```
+Kiểm tra một URL có thể kết thúc theo một trong các trạng thái sau, trả về
+trong cùng response đồng bộ:
 
 - `completed`: xử lý xong trong phạm vi dự kiến.
 - `partial`: có kết quả nhưng một phần nội dung không đọc được hoặc bị giới hạn.
 - `failed`: không tạo được kết quả usable do lỗi validation, network hoặc worker.
 
-Trạng thái và limitation chỉ tồn tại trong phiên xử lý; database chỉ lưu
-`url_checks.checked_at`.
+Response phải nêu lỗi có kiểm soát và giới hạn gặp phải; system không lưu lại
+các trạng thái này sau khi đã phản hồi.
 
-### FR-008 History and CRUD
+### FR-008 History và xóa lịch sử
 
-User có thể xem và xóa lịch sử URL của chính mình. Mọi thao tác authentication
-và history đều đi qua API; frontend không truy cập database. Mọi truy vấn URL
-history phải lọc theo authenticated `user_id`.
+User có thể xem danh sách URL mình đã kiểm tra (`url`, `checked_at`) và xóa một
+mục lịch sử. Mọi thao tác authentication, kiểm tra URL và truy cập lịch sử đều
+đi qua API; frontend không truy cập database. Mọi truy vấn lịch sử phải lọc
+theo authenticated `user_id`. Lịch sử không lưu lại hidden link hay DOM của lần
+kiểm tra tương ứng.
 
 ## 5. API contract
 
@@ -141,18 +139,18 @@ history phải lọc theo authenticated `user_id`.
 | `GET` | `/v1/auth/google/callback` | Hoàn tất Google OAuth |
 | `POST` | `/v1/auth/logout` | Đăng xuất |
 | `GET` | `/v1/me` | Lấy user hiện tại |
-| `POST` | `/v1/link-checks` | Tạo link check |
-| `GET` | `/v1/link-checks/{check_id}` | Lấy kết quả link check |
-| `DELETE` | `/v1/link-checks/{check_id}` | Xóa link check |
-| `GET` | `/v1/me/link-checks` | Lấy lịch sử của user |
+| `POST` | `/v1/link-checks` | Kiểm tra một URL và trả kết quả đồng bộ |
+| `DELETE` | `/v1/me/link-checks/{check_id}` | Xóa một mục lịch sử |
+| `GET` | `/v1/me/link-checks` | Lấy lịch sử URL đã kiểm tra của user |
 
 Response tạo scan tối thiểu:
 
 ```json
 {
-  "scan_id": "scan_123",
-  "status": "queued",
-  "created_at": "2026-09-22T10:00:00Z"
+  "check_id": "scan_123",
+  "status": "completed",
+  "submitted_url": "https://example.com",
+  "links": []
 }
 ```
 
@@ -162,24 +160,25 @@ Response tạo scan tối thiểu:
 
 `id`, `google_subject`, `email`, `status`, `created_at`, `last_login_at`
 
-### URL check history
+### UrlCheck
 
 `id`, `user_id`, `url`, `checked_at`
 
-### LinkResult (memory only)
-
-`id`, `link_check_id`, `element_type`, `object_reference`, `source_url`, `actual_url`, `visibility`, `visible_text`, `alt_text`, `position`
+Hidden link (`element_type`, `object_reference`, `source_url`, `actual_url`,
+`visibility`, `visible_text`, `alt_text`, `position`) chỉ tồn tại trong response
+của request kiểm tra tương ứng và không có bảng lưu trữ riêng.
 
 ## 7. Non-functional requirements
 
 - **Security:** SSRF protection, sandbox worker, authentication và ownership checks.
-- **Privacy:** chỉ URL history có retention; DOM và hidden links không được lưu.
+- **Privacy:** DOM và URL có retention; hạn chế log query string nhạy cảm.
 - **Reliability:** timeout, 403, 429, SSL error và HTML lỗi phải trả trạng thái có kiểm soát.
 - **Performance:** static page nhỏ phải hoàn tất trong timeout cấu hình; dashboard không cần tải toàn bộ HTML.
 - **Maintainability:** ứng dụng tổ chức theo MVC dễ đọc và maintenance; extractor,
   persistence và API/UI contract phải tách biệt.
-- **Persistence:** PostgreSQL lưu users, auth state và `url_checks` với migration,
-  foreign key và index ownership. SQLite chỉ dành cho test/prototype.
+- **Persistence:** PostgreSQL là database chính cho lịch sử URL đã kiểm tra,
+  dùng migration có version, foreign key, transaction và index phù hợp cho
+  ownership và truy vấn lịch sử. SQLite chỉ dành cho test/prototype nếu cần.
 
 ## 8. Known limitations
 
@@ -195,18 +194,17 @@ phân biệt đúng `visibility`; URL tương đối được resolve theo final
 
 ### AC-02 Non-navigation
 
-Hidden link được parse và lưu nhưng không làm phát sinh request, redirect hoặc
-navigation tới actual URL.
+Hidden link được parse và trả về trong response nhưng không làm phát sinh
+request, redirect hoặc navigation tới actual URL.
 
 ### AC-03 Dashboard
 
-Link check completed hiển thị URL đầu vào, DOM được phép lưu và danh sách hidden
-link cùng visibility và object nguồn.
+Sau khi gọi API thành công, dashboard hiển thị ngay URL đầu vào, DOM được phép
+hiển thị và danh sách hidden link cùng visibility và object nguồn của lần gọi đó.
 
 ### AC-04 Ownership
 
-User không thể đọc, cập nhật hoặc xóa link check/link result của user khác, kể
-cả khi biết `check_id`.
+User không thể đọc hoặc xóa lịch sử URL của user khác, kể cả khi biết `check_id`.
 
 ### AC-05 SSRF
 
@@ -214,8 +212,8 @@ URL localhost/private IP/metadata bị từ chối trước khi worker truy cậ
 
 ### AC-06 Controlled failure
 
-Timeout, lỗi network hoặc vượt resource limit kết thúc link check bằng trạng thái
-có kiểm soát, không làm lộ secret và không làm API crash.
+Timeout, lỗi network hoặc vượt resource limit trả về response với trạng thái
+`partial` hoặc `failed` có kiểm soát, không làm lộ secret và không làm API crash.
 
 ## 10. Out of scope for MVP
 

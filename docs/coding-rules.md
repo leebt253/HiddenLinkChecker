@@ -64,8 +64,8 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
 - Dùng docstring theo phong cách Python cho module, class và public function
   có contract hoặc hành vi không tầm thường; không dùng JSDoc hay JavaDoc.
 - Docstring cần nêu input, output, exception và side effect quan trọng.
-- Cập nhật documentation khi thay đổi contract của link result, link check
-  lifecycle hoặc giới hạn bảo mật.
+- Cập nhật documentation khi thay đổi contract của link result, vòng đời request
+  kiểm tra URL hoặc giới hạn bảo mật.
 
 ## 5. URL và an toàn khi scan
 
@@ -86,20 +86,21 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
 - Mỗi link result phải giữ `element_type`, `object_reference`, `source_url`,
   `actual_url` và `visibility`.
 - URL tương đối phải được resolve theo final URL của trang đầu vào.
-- `actual_url` chỉ là dữ liệu kết quả; không được fetch, mở hoặc điều hướng tới
-  link đã phát hiện.
+- `actual_url` chỉ là dữ liệu kết quả trả về trong response; không được fetch,
+  mở, điều hướng tới hoặc lưu trữ lại link đã phát hiện sau khi phản hồi.
 - Mọi kết quả đều là hidden link; phân biệt link hiển thị trực tiếp và không
   trực tiếp bằng `visibility = direct` hoặc `visibility = indirect`.
 - Khi không thể đọc đầy đủ nội dung do JavaScript, iframe, CAPTCHA, login,
-  timeout hoặc resource limit, ghi nhận `partial` và limitation thay vì đoán.
+  timeout hoặc resource limit, trả về `partial` và limitation trong response
+  thay vì đoán.
 
 ## 7. Bảo mật dữ liệu và ownership
 
-- Mọi truy vấn link check và link result phải kiểm tra authenticated `user_id`.
+- Mọi truy vấn lịch sử URL đã kiểm tra phải kiểm tra authenticated `user_id`.
 - Không trả hoặc xóa dữ liệu của user khác chỉ dựa trên `check_id` do client gửi.
 - Không lưu hoặc log Google OAuth credential/token.
-- DOM, URL và link result phải tuân thủ retention policy; việc xóa link check
-  phải xử lý dữ liệu liên quan theo cùng policy.
+- Lịch sử URL phải tuân thủ retention policy; hidden link không được lưu trữ
+  sau khi response đã được trả về nên không cần retention riêng cho phần này.
 - Error response phải đủ hữu ích cho client nhưng không làm lộ secret, thông tin
   nội bộ hoặc dữ liệu của tài khoản khác.
 
@@ -108,7 +109,8 @@ render URL và giữ dữ liệu đúng phạm vi tài khoản.
 - Viết unit test riêng cho extractor, URL normalization, visibility direct/
   indirect và các policy bảo mật.
 - Viết integration test cho các lát dọc chính: lấy DOM an toàn của một URL,
-  trích xuất text/image/background, lưu kết quả và chuyển trạng thái link check.
+  trích xuất text/image/background trong cùng response đồng bộ và lưu lịch sử
+  URL đã kiểm tra.
 - Kiểm thử cả trường hợp lỗi: URL không hợp lệ, redirect nguy hiểm, timeout,
   response lỗi, dữ liệu thiếu và kết quả `partial`.
 - Mỗi bug bảo mật hoặc regression của contract phải có test tái hiện trước hoặc

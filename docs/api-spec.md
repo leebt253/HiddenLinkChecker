@@ -2,9 +2,10 @@
 
 ## 1. Phạm vi
 
-API MVP hỗ trợ Google OAuth, tạo một lần kiểm tra URL, lấy hidden link từ DOM
-của URL đầu vào trong phiên xử lý và tải lịch sử URL. API không
-fetch, mở hoặc điều hướng tới các link được phát hiện.
+API MVP hỗ trợ Google OAuth, kiểm tra một URL đồng bộ, lấy hidden link từ DOM
+của URL đầu vào ngay trong response và tải lịch sử URL đã kiểm tra. API không
+fetch, mở hoặc điều hướng tới các link được phát hiện, và không lưu lại chi
+tiết hidden link sau khi đã phản hồi.
 
 ## 2. Endpoints
 
@@ -14,13 +15,12 @@ fetch, mở hoặc điều hướng tới các link được phát hiện.
 | `GET` | `/v1/auth/google/callback` | Hoàn tất Google OAuth |
 | `POST` | `/v1/auth/logout` | Đăng xuất |
 | `GET` | `/v1/me` | Lấy user hiện tại |
-| `POST` | `/v1/link-checks` | Tạo link check bất đồng bộ |
-| `GET` | `/v1/link-checks/{check_id}` | Lấy kết quả link check |
-| `DELETE` | `/v1/link-checks/{check_id}` | Xóa link check |
-| `GET` | `/v1/me/link-checks` | Lấy lịch sử của user |
+| `POST` | `/v1/link-checks` | Kiểm tra một URL và trả kết quả đồng bộ |
+| `DELETE` | `/v1/me/link-checks/{check_id}` | Xóa một mục lịch sử |
+| `GET` | `/v1/me/link-checks` | Lấy lịch sử URL đã kiểm tra của user |
 
-Mọi endpoint CRUD yêu cầu authenticated Google user. Frontend không truy cập
-trực tiếp database.
+Mọi endpoint yêu cầu authenticated Google user, trừ hai endpoint OAuth. Frontend
+không truy cập trực tiếp database.
 
 ## 3. Authentication
 
@@ -34,30 +34,23 @@ Không lưu Google access token nếu API không gọi Google thay mặt user.
 
 API không trả OAuth secret, token, stack trace hoặc thông tin nội bộ.
 
-## 4. Tạo link check
+## 4. Kiểm tra một URL
 
 `POST /v1/link-checks` yêu cầu:
 
 ```json
 {
-  "url": "https://example.com",
-  "include_dom": true
+  "url": "https://example.com"
 }
 ```
 
-Chỉ nhận scheme `http` và `https`. Response:
+Chỉ nhận scheme `http` và `https`. Request được xử lý đồng bộ: API fetch/render
+URL đầu vào, trích xuất hidden link và trả toàn bộ kết quả trong cùng response
+(xem mục 5). Redirect của URL đầu vào phải được kiểm tra SSRF sau mỗi bước. API
+không fetch, mở, redirect hoặc điều hướng tới URL nào được phát hiện trong DOM.
 
-```json
-{
-  "check_id": "check_123",
-  "status": "queued",
-  "created_at": "2026-09-23T10:00:00Z"
-}
-```
-
-Worker chỉ fetch/render URL đầu vào. Redirect của URL đầu vào phải được kiểm
-tra SSRF sau mỗi bước. Worker không fetch, mở, redirect hoặc điều hướng tới URL
-nào được phát hiện trong DOM.
+Sau khi phản hồi, API lưu một bản ghi lịch sử tối giản (`id`, `url`,
+`checked_at`) cho user; hidden link phát hiện được không được lưu lại.
 
 ## 5. Link check response
 
@@ -68,12 +61,8 @@ nào được phát hiện trong DOM.
   "submitted_url": "https://example.com",
   "normalized_url": "https://example.com/",
   "final_url": "https://example.com/home",
-  "dom_reference": "dom_123",
-  "created_at": "2026-09-23T10:00:00Z",
-  "completed_at": "2026-09-23T10:00:05Z",
   "links": [
     {
-      "id": "link_result_123",
       "element_type": "image",
       "object_reference": "img_42",
       "source_url": "/promo",
@@ -89,15 +78,18 @@ nào được phát hiện trong DOM.
 
 Mọi kết quả trong response là hidden link. `visibility = direct` biểu thị link
 hiển thị trực tiếp; `visibility = indirect` biểu thị link nằm sau image,
-background hoặc object không hiển thị như link trực tiếp.
-MVP không có trường đánh giá rủi ro hoặc risk verdict.
+background hoặc object không hiển thị như link trực tiếp. `links` không có `id`
+ổn định vì không được lưu trữ. MVP không có trường đánh giá rủi ro hoặc risk
+verdict.
 
-## 6. Ownership và CRUD
+## 6. Ownership và lịch sử
 
 - Server lấy `user_id` từ credential, không nhận `user_id` để gán ownership từ
   client.
-- Mọi query phải lọc theo authenticated `user_id` trước khi đọc/cập nhật/xóa.
-- `DELETE` chỉ xóa bản ghi URL history thuộc user.
+- Mọi query lịch sử phải lọc theo authenticated `user_id` trước khi đọc/xóa.
+- `DELETE /v1/me/link-checks/{check_id}` chỉ xóa bản ghi lịch sử (`url`,
+  `checked_at`) của chính user; không có dữ liệu con nào khác cần xử lý vì
+  hidden link không được lưu trữ.
 - API không tiết lộ việc một `check_id` của user khác có tồn tại hay không.
 
 ## 7. URL và dữ liệu nhạy cảm
@@ -110,9 +102,8 @@ MVP không có trường đánh giá rủi ro hoặc risk verdict.
 
 ## 8. PostgreSQL persistence
 
-PostgreSQL là database production chính với các bảng `users`, auth tables và
-`url_checks`. Hidden-link results chỉ tồn tại trong memory của process xử lý.
-Migration có version và foreign key bảo vệ ownership.
+PostgreSQL là database production chính với các bảng tối thiểu `users` và
+`url_checks`. Dùng foreign key, transaction và migration có version.
 
 Index tối thiểu:
 

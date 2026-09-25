@@ -1,51 +1,85 @@
 # Hidden Link Checker - Domain Model
 
-## Scope
+## 1. Phạm vi MVP
 
-MVP nhận một URL, lấy DOM của URL đầu vào, tìm hidden links và hiển thị kết quả
-trong phiên xử lý. PostgreSQL chỉ lưu identity và URL history.
+MVP nhận một URL, lấy DOM của chính URL đầu vào, tìm hidden link và trả toàn bộ
+kết quả **đồng bộ trong cùng một response**. Mọi URL được phát hiện đều là hidden
+link; link hiển thị trực tiếp chỉ là một subtype có visibility `direct`. Hidden
+link chỉ tồn tại trong phạm vi request đó; hệ thống chỉ lưu lại lịch sử URL đã
+kiểm tra (`UrlCheck`), không lưu chi tiết hidden link sau khi đã phản hồi. MVP
+không đánh giá rủi ro, không dùng severity/rule và không mở hoặc request tới
+các link được phát hiện.
 
-## Entities
+## 2. Quan hệ domain
+
+```mermaid
+erDiagram
+    USER ||--o{ URL_CHECK : owns
+```
+
+## 3. Entity
 
 ### User
 
-`id`, `google_subject`, `email`, `status`, `created_at`, `last_login_at`.
+Đại diện tài khoản nội bộ liên kết với Google OAuth/OIDC.
 
-`google_subject` chỉ dùng nội bộ để liên kết Google identity. Mọi URL history
-đều được truy vấn theo authenticated `user_id`.
+Fields chính: `id`, `google_subject`, `email`, `status`, `created_at`,
+`last_login_at`.
 
-### URL check history
+`google_subject` chỉ dùng nội bộ để liên kết identity, không trả qua public API.
+Mọi dữ liệu kiểm tra phải được truy vấn theo authenticated `user_id`.
 
-`id`, `user_id`, `url`, `checked_at`.
+### UrlCheck
 
-Đây là entity duy nhất của một lần check được lưu vào PostgreSQL. Xóa user sẽ
-cascade xóa URL history.
+Đại diện việc user đã yêu cầu kiểm tra một URL. Đây là bản ghi lịch sử duy nhất
+được lưu trữ lâu dài.
 
-### LinkResult (memory only)
+Fields chính: `id`, `user_id`, `url`, `checked_at`.
 
-`id`, `element_type`, `object_reference`, `source_url`, `actual_url`,
+`UrlCheck` không lưu `status`, DOM, hay danh sách hidden link. Việc fetch/render
+URL đầu vào và trích xuất hidden link diễn ra trong cùng vòng đời của một request
+API và không có trạng thái trung gian cần theo dõi.
+
+### LinkResult (giá trị tạm thời, không persist)
+
+Đại diện một link được phát hiện trong DOM khi xử lý một request. `LinkResult`
+chỉ tồn tại trong bộ nhớ trong lúc xử lý request và trong response trả về; nó
+không có bảng lưu trữ và không có `id` ổn định qua các lần gọi khác nhau.
+
+Fields chính: `element_type`, `object_reference`, `source_url`, `actual_url`,
 `visibility`, `visible_text`, `alt_text`, `position`.
 
-`LinkResult` được tạo bởi extractor để trả về dashboard trong process hiện tại.
-Nó không có bảng database và mất khi process restart. `actual_url` chỉ là dữ
-liệu kết quả; system không fetch, mở, redirect hoặc điều hướng tới URL đó.
+- `element_type`: `text`, `image` hoặc `background`.
+- `visibility = direct`: hidden link hiển thị trực tiếp, ví dụ anchor có text.
+- `visibility = indirect`: hidden link nằm sau image, background hoặc object
+  không hiển thị như link trực tiếp.
+- `source_url`: URL literal đọc được từ DOM.
+- `actual_url`: URL sau khi resolve theo final URL của trang đầu vào.
+- `position`: bounding box nếu lấy được, có thể `null`.
 
-## Invariants
+`actual_url` chỉ là dữ liệu kết quả. System không fetch, mở, redirect hoặc
+điều hướng tới `actual_url` trong MVP, và không lưu lại `actual_url` sau khi
+response đã được trả về (ngoài trường `url` gốc trong `UrlCheck`).
 
-1. Mỗi URL history thuộc đúng một `User`.
-2. Client không được tự gửi `user_id`; server lấy từ authenticated session.
-3. API phải lọc ownership trước mọi thao tác đọc hoặc xóa.
-4. Không lưu hoặc log OAuth secret, token, raw query string nhạy cảm hoặc DOM.
+## 4. Invariants và ownership
 
-## PostgreSQL mapping
+1. Mỗi `UrlCheck` thuộc đúng một `User`.
+2. Client không được tự gửi `user_id`; server lấy từ Google-authenticated user.
+3. API phải lọc ownership trước mọi thao tác đọc hoặc xóa lịch sử.
+4. Không lưu hoặc log OAuth secret, token, raw query string nhạy cảm, DOM đầy đủ
+   hoặc danh sách `LinkResult` sau khi request kết thúc.
+5. Xóa một `UrlCheck` chỉ xóa bản ghi lịch sử đó; không có dữ liệu con nào khác
+   để dọn dẹp.
 
-Các bảng cần giữ:
+## 5. PostgreSQL mapping
 
-- `users`.
-- `user_sessions`.
-- `oauth_login_transactions`.
-- `url_checks`.
+PostgreSQL là database production chính, chỉ lưu lịch sử URL đã kiểm tra. Dùng
+foreign key từ `url_checks.user_id` đến `users.id`.
 
-Index chính: unique `users.google_subject` và
-`url_checks(user_id, checked_at DESC)`. Các bảng `link_checks` và `link_results`
-không còn cần thiết và được loại bỏ bởi migration.
+Index tối thiểu:
+
+- `users.google_subject` unique;
+- `url_checks.user_id, checked_at` cho lịch sử.
+
+Không có dữ liệu hidden link nào cần lưu dưới dạng JSONB hay bảng phụ; toàn bộ
+`LinkResult` chỉ tồn tại trong response của request tương ứng.

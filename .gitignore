@@ -7,3 +7,7 @@ __pycache__/
 .env
 .env.*
 !.env.example
+examples/
+docs/reports/
+migrations/
+reports/

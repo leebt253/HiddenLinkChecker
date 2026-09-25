@@ -10,7 +10,6 @@ trực tiếp chỉ là một dạng hidden link có `visibility = direct`.
 - [Tính năng](#tính-năng)
 - [Kiến trúc và công nghệ](#kiến-trúc-và-công-nghệ)
 - [Cài đặt](#cài-đặt)
-- [Tax Calculation](#tax-calculation)
 - [Sử dụng](#sử-dụng)
 - [Bảo mật](#bảo-mật)
 - [Cấu trúc repository](#cấu-trúc-repository)
@@ -38,7 +37,7 @@ Nhập URL trên dashboard
 API lấy DOM của URL đầu vào
 				|
 				v
-Hiển thị và lưu hidden link theo user
+Hiển thị hidden link trong response của lần kiểm tra; chỉ lưu URL history theo user
 ```
 
 ## Tính năng
@@ -52,7 +51,7 @@ Hiển thị và lưu hidden link theo user
 - Resolve URL tương đối theo URL cuối cùng của trang đầu vào.
 - Hiển thị URL nguồn, URL thực tế, loại object và thông tin element.
 - Lưu URL và thời điểm kiểm tra theo user để tải lại lịch sử.
-- API-first: authentication, tạo, đọc, cập nhật và xóa dữ liệu đều đi qua API.
+- API-first: authentication, kiểm tra URL, đọc và xóa URL history đều đi qua API.
 - PostgreSQL làm database chính cho user, auth session và URL history.
 
 ## Kiến trúc và công nghệ
@@ -99,84 +98,30 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-## Tax Calculation
+Google OAuth credentials và cấu hình PostgreSQL sẽ được cung cấp qua biến môi
+trường khi web application được triển khai. Sao chép `.env.example` thành
+`.env` và điền giá trị triển khai thực tế; không commit tệp `.env`.
 
-Build và cài thư viện tính thuế sibling project trước khi chạy module tích hợp:
+### Cấu hình Google OAuth
 
-```powershell
-Push-Location ..\TaxCalculationLibrary
-python -m pip install -e ".[test]"
-Pop-Location
-```
+1. Tạo OAuth 2.0 Client ID loại Web application trong Google Cloud Console.
+2. Đăng ký Authorized redirect URI đúng bằng
+	`HIDDEN_LINK_CHECKER_GOOGLE_REDIRECT_URI`, mặc định là
+	`http://127.0.0.1:8000/v1/auth/google/callback`.
+3. Đặt `HIDDEN_LINK_CHECKER_GOOGLE_CLIENT_ID`,
+   `HIDDEN_LINK_CHECKER_GOOGLE_CLIENT_SECRET`,
+   `HIDDEN_LINK_CHECKER_DATABASE_URL` và `HIDDEN_LINK_CHECKER_WEB_BASE_URL`
+   trong `.env`. `HIDDEN_LINK_CHECKER_DATABASE_URL` phải theo dạng
+   `postgresql://user:password@localhost:5432/hidden_link_checker` vì ứng dụng
+   dùng `psycopg` trực tiếp.
+4. Khi deploy HTTPS, đặt `HIDDEN_LINK_CHECKER_SESSION_COOKIE_SECURE=true`.
 
-### Chạy test thư viện
-
-Từ thư mục `HiddenLinkChecker`, chạy test của thư viện dùng chung:
-
-```powershell
-Push-Location ..\TaxCalculationLibrary
-..\HiddenLinkChecker\.venv\Scripts\python.exe -m pytest -q
-Pop-Location
-```
-
-Kết quả mong đợi hiện tại là `10 passed`.
-
-Chạy test adapter JSON trong HiddenLinkChecker:
+Áp dụng schema nền tảng trước, rồi migration session/OIDC:
 
 ```powershell
-.venv\Scripts\python.exe -m pytest -q tests\unit\api\test_tax_calculation.py
+psql $env:HIDDEN_LINK_CHECKER_DATABASE_URL -v ON_ERROR_STOP=1 -f scripts/initial_schema.sql
+psql $env:HIDDEN_LINK_CHECKER_DATABASE_URL -v ON_ERROR_STOP=1 -f migrations/0002_auth_sessions.sql
 ```
-
-Chạy toàn bộ test của HiddenLinkChecker:
-
-```powershell
-.venv\Scripts\python.exe -m pytest -q
-```
-
-### Input và output mẫu
-
-Module `hidden_link_checker_api.services.tax_calculation` cung cấp
-`calculate_tax(data, metadata)` và `calculate_tax_file(input_path, output_path)`. Mười input JSON mẫu
-với tối thiểu 10 dòng mỗi file nằm trong [examples/tax_inputs](examples/tax_inputs/).
-Output mẫu tương ứng nằm trong [examples/tax_outputs](examples/tax_outputs/).
-
-Chạy một input JSON thực tế từ PowerShell:
-
-```powershell
-.venv\Scripts\python.exe scripts\run_tax_calculation.py `
-	examples\tax_inputs\retail_order.json `
-	examples\tax_outputs\retail_order.result.json
-```
-
-Kết quả được ghi vào file output JSON chỉ định. Có thể gọi trực tiếp trong Python:
-
-```python
-from hidden_link_checker_api.services.tax_calculation import calculate_tax_file
-
-calculate_tax_file("input.json", "output.json")
-```
-
-Có thể chạy bằng CMD bằng file [scripts/run_tax_calculation.cmd](scripts/run_tax_calculation.cmd):
-
-```cmd
-scripts\run_tax_calculation.cmd
-```
-
-Khi được hỏi, nhập đường dẫn file input JSON, ví dụ:
-
-```text
-examples\tax_inputs\hotel_booking.json
-```
-
-Output sẽ tự động được tạo cùng thư mục với tên:
-
-```text
-hotel_booking.result.json
-```
-
-Output được tạo cùng thư mục với input và có hậu tố `.result.json`.
-
-Tax Calculation không phụ thuộc Google OAuth, PostgreSQL hoặc web server.
 
 ## Sử dụng
 
@@ -227,10 +172,11 @@ Sau đó, trong terminal khác, khởi động Web module:
 python -m uvicorn hidden_link_checker_web.main:app --host 127.0.0.1 --port 8001
 ```
 
-Web module chỉ gọi HTTP API qua cấu hình runtime; không truy cập database hoặc
-import repository của API. Khi được cấu hình database, API dùng PostgreSQL cho
-user, transaction OIDC và session. Cookie chỉ chứa opaque session token; API
-chỉ lưu hash token, không lưu Google access token hoặc refresh token.
+Web module chỉ gọi HTTP API qua `HIDDEN_LINK_CHECKER_API_BASE_URL`; không truy
+cập database hoặc import repository của API. Khi có
+`HIDDEN_LINK_CHECKER_DATABASE_URL`, API dùng PostgreSQL cho user, transaction
+OIDC và session. Cookie chỉ chứa opaque session token; API chỉ lưu hash token,
+không lưu Google access token hoặc refresh token.
 
 Mở `http://127.0.0.1:8001/login`, chọn **Đăng nhập với Google**, rồi hoàn tất
 Google sign-in. Callback sẽ tạo/cập nhật user theo `google_subject`, thiết lập
@@ -257,12 +203,6 @@ for link in links:
 Kết quả cho biết loại object, URL nguồn, URL sau khi resolve và `visibility`.
 
 ## Bảo mật
-
-Phần Tax Calculation không yêu cầu credential. Đối với phần Hidden Link Checker,
-các giá trị OAuth, database URL và session secret phải được cấp qua secret
-manager hoặc biến môi trường ở runtime. Không đưa client secret, mật khẩu,
-database URL thật hoặc file cấu hình local vào repository, README, log hay
-output JSON.
 
 URL người dùng nhập là một ranh giới bảo mật quan trọng. Implementation phải:
 
@@ -303,6 +243,7 @@ URL người dùng nhập là một ranh giới bảo mật quan trọng. Implem
 ├── tests/
 │   ├── integration/
 │   └── unit/
+├── .env.example
 ├── pyproject.toml
 ├── CONTRIBUTING.md
 └── README.md
